@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: path_finder_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: juragansengon88
+      POSTGRES_PASSWORD: juragansengon88
+      POSTGRES_DB: path_finder_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U femas -d path_finder_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - path_finder_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: path_finder_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - path_finder_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  path_finder_network:
+    driver: bridge
