@@ -5,6 +5,10 @@
   "web": {
     "port": 3000
   },
+  "jwt": {
+    "secret": "super-secret-path-finder-key-2026",
+    "expire": 86400
+  },
   "database": {
     "username": "juragansengon88",
     "password": "juragansengon88",
