@@ -1,8 +1,12 @@
 package config
 
 import (
+	"haji-koding/path-finder/internal/delivery/http"
 	"haji-koding/path-finder/internal/delivery/http/middleware"
 	"haji-koding/path-finder/internal/delivery/http/route"
+	"haji-koding/path-finder/internal/entity"
+	"haji-koding/path-finder/internal/repository"
+	"haji-koding/path-finder/internal/usecase"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
@@ -20,11 +24,30 @@ type BootstrapConfig struct {
 }
 
 func Bootstrap(config *BootstrapConfig) {
+	// Auto migrate entities
+	if err := config.DB.AutoMigrate(&entity.User{}); err != nil {
+		config.Log.Fatalf("Failed to auto migrate database: %v", err)
+	}
 
-	authMiddleware := middleware.NewAuth()
+	// Setup repositories
+	userRepository := repository.NewUserRepository(config.Log)
+
+	// Setup use cases
+	userUseCase := usecase.NewUserUseCase(config.DB, config.Log, config.Validate, config.Config, userRepository)
+
+	// Setup controllers
+	userController := http.NewUserController(userUseCase, config.Log)
+	hajiCodingController := http.NewHajiCodingController(config.Log)
+
+	// Setup middleware
+	authMiddleware := middleware.NewAuth(config.Config)
+
+	// Setup routes
 	routeConfig := route.RouteConfig{
-		App:            config.App,
-		AuthMiddleware: authMiddleware,
+		App:                  config.App,
+		UserController:       userController,
+		HajiCodingController: hajiCodingController,
+		AuthMiddleware:       authMiddleware,
 	}
 	routeConfig.Setup()
 }

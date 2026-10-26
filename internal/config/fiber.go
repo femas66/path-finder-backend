@@ -2,7 +2,7 @@ package config
 
 import (
 	"errors"
-	"fmt"
+	"haji-koding/path-finder/internal/model"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/spf13/viper"
@@ -19,15 +19,11 @@ func NewFiber(config *viper.Viper) *fiber.App {
 				code = e.Code
 			}
 
-			err = ctx.Status(code).SendFile(fmt.Sprintf("./%d.html", code))
-			if err != nil {
-				return ctx.Status(code).JSON(fiber.Map{
-					"success": false,
-					"error":   err.Error(),
-				})
-			}
-
-			return nil
+			return ctx.Status(code).JSON(model.WebResponse[any]{
+				Success: false,
+				Message: err.Error(),
+				Errors:  err.Error(),
+			})
 		},
 	})
 
