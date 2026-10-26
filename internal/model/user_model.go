@@ -28,6 +28,14 @@ type LoginResponse struct {
 	User  UserResponse `json:"user"`
 }
 
+type ForgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email,max=100"`
+}
+
+type ForgotPasswordResponse struct {
+	Email string `json:"email"`
+}
+
 type VerifyUserRequest struct {
 	Token string `validate:"required,max=100"`
 }
