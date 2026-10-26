@@ -26,8 +26,10 @@ func (c *RouteConfig) SetupGuestRoute() {
 	if c.UserController != nil {
 		c.App.Post("/api/users/register", c.UserController.Register)
 		c.App.Post("/api/users/login", c.UserController.Login)
+		c.App.Post("/api/users/forgot-password", c.UserController.ForgotPassword)
 		c.App.Post("/api/auth/register", c.UserController.Register)
 		c.App.Post("/api/auth/login", c.UserController.Login)
+		c.App.Post("/api/auth/forgot-password", c.UserController.ForgotPassword)
 	}
 }
 

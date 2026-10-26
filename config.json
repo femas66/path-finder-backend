@@ -9,6 +9,13 @@
     "secret": "super-secret-path-finder-key-2026",
     "expire": 86400
   },
+  "mail": {
+    "host": "",
+    "port": 587,
+    "username": "",
+    "password": "",
+    "from": "no-reply@pathfinder.com"
+  },
   "database": {
     "username": "juragansengon88",
     "password": "juragansengon88",

@@ -22,3 +22,9 @@ func UserToLoginResponse(user *entity.User, token string) *model.LoginResponse {
 		User:  *UserToResponse(user),
 	}
 }
+
+func UserToForgotPasswordResponse(email string) *model.ForgotPasswordResponse {
+	return &model.ForgotPasswordResponse{
+		Email: email,
+	}
+}

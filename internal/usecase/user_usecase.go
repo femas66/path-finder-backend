@@ -2,12 +2,15 @@ package usecase
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"time"
 
 	"haji-koding/path-finder/internal/entity"
 	"haji-koding/path-finder/internal/model"
 	"haji-koding/path-finder/internal/model/converter"
 	"haji-koding/path-finder/internal/repository"
+	"haji-koding/path-finder/internal/service"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
@@ -20,11 +23,13 @@ import (
 )
 
 type UserUseCase struct {
-	DB             *gorm.DB
-	Log            *logrus.Logger
-	Validate       *validator.Validate
-	Viper          *viper.Viper
-	UserRepository *repository.UserRepository
+	DB                      *gorm.DB
+	Log                     *logrus.Logger
+	Validate                *validator.Validate
+	Viper                   *viper.Viper
+	UserRepository          *repository.UserRepository
+	PasswordResetRepository *repository.PasswordResetRepository
+	MailService             service.MailService
 }
 
 func NewUserUseCase(
@@ -33,13 +38,17 @@ func NewUserUseCase(
 	validate *validator.Validate,
 	viperConfig *viper.Viper,
 	userRepo *repository.UserRepository,
+	passwordResetRepo *repository.PasswordResetRepository,
+	mailService service.MailService,
 ) *UserUseCase {
 	return &UserUseCase{
-		DB:             db,
-		Log:            logger,
-		Validate:       validate,
-		Viper:          viperConfig,
-		UserRepository: userRepo,
+		DB:                      db,
+		Log:                     logger,
+		Validate:                validate,
+		Viper:                   viperConfig,
+		UserRepository:          userRepo,
+		PasswordResetRepository: passwordResetRepo,
+		MailService:             mailService,
 	}
 }
 
@@ -140,4 +149,71 @@ func (u *UserUseCase) Login(ctx context.Context, request *model.LoginUserRequest
 	}
 
 	return converter.UserToLoginResponse(user, tokenString), nil
+}
+
+func (u *UserUseCase) ForgotPassword(ctx context.Context, request *model.ForgotPasswordRequest) (*model.ForgotPasswordResponse, error) {
+	if err := u.Validate.Struct(request); err != nil {
+		u.Log.Warnf("Invalid forgot password request: %v", err)
+		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	user := new(entity.User)
+	err := u.UserRepository.FindByEmail(u.DB.WithContext(ctx), user, request.Email)
+	if err != nil {
+		u.Log.Warnf("User not found for email %s: %v", request.Email, err)
+		return nil, fiber.NewError(fiber.StatusNotFound, "email tidak ditemukan")
+	}
+
+	// Hapus kode reset lama untuk email ini jika ada
+	_ = u.PasswordResetRepository.DeleteByEmail(u.DB.WithContext(ctx), request.Email)
+
+	// Buat 6-digit kode OTP
+	code, err := generateRandomCode(6)
+	if err != nil {
+		u.Log.Errorf("Failed to generate OTP code: %v", err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal membuat kode verifikasi")
+	}
+
+	passwordReset := &entity.PasswordReset{
+		ID:        uuid.New().String(),
+		Email:     request.Email,
+		Code:      code,
+		ExpiredAt: time.Now().Add(15 * time.Minute),
+	}
+
+	if err := u.PasswordResetRepository.Create(u.DB.WithContext(ctx), passwordReset); err != nil {
+		u.Log.Errorf("Failed to save password reset code: %v", err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal menyimpan kode verifikasi")
+	}
+
+	// Kirim email secara asynchronous agar waktu respons API sangat cepat (< 10ms)
+	emailSubject := "Kode Verifikasi Lupa Password - Path Finder"
+	emailBody := fmt.Sprintf(`
+		<div style="font-family: Arial, sans-serif; padding: 20px;">
+			<h2>Kode Verifikasi Lupa Password</h2>
+			<p>Halo <strong>%s</strong>,</p>
+			<p>Kami menerima permintaan untuk mereset password akun Anda. Berikut adalah kode verifikasi Anda:</p>
+			<div style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #2563eb; padding: 10px 0;">
+				%s
+			</div>
+			<p>Kode ini berlaku selama <strong>15 menit</strong>. Jangan bagikan kode ini kepada siapa pun.</p>
+			<p>Jika Anda tidak merasa meminta reset password, abaikan email ini.</p>
+		</div>
+	`, user.Name, code)
+
+	u.MailService.SendEmailAsync(request.Email, emailSubject, emailBody)
+
+	return converter.UserToForgotPasswordResponse(request.Email), nil
+}
+
+func generateRandomCode(length int) (string, error) {
+	const digits = "0123456789"
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = digits[b[i]%byte(len(digits))]
+	}
+	return string(b), nil
 }

@@ -65,3 +65,26 @@ func (c *UserController) Login(ctx fiber.Ctx) error {
 		Data:    response,
 	})
 }
+
+func (c *UserController) ForgotPassword(ctx fiber.Ctx) error {
+	request := new(model.ForgotPasswordRequest)
+	if err := ctx.Bind().Body(request); err != nil {
+		c.Log.Warnf("Failed to parse forgot password request body: %v", err)
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Success: false,
+			Message: "Permintaan tidak valid",
+			Errors:  err.Error(),
+		})
+	}
+
+	response, err := c.UseCase.ForgotPassword(ctx.Context(), request)
+	if err != nil {
+		return err
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[*model.ForgotPasswordResponse]{
+		Success: true,
+		Message: "Kode verifikasi telah dikirim ke email",
+		Data:    response,
+	})
+}

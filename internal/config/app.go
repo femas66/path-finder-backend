@@ -6,6 +6,7 @@ import (
 	"haji-koding/path-finder/internal/delivery/http/route"
 	"haji-koding/path-finder/internal/entity"
 	"haji-koding/path-finder/internal/repository"
+	"haji-koding/path-finder/internal/service"
 	"haji-koding/path-finder/internal/usecase"
 
 	"github.com/go-playground/validator/v10"
@@ -25,15 +26,27 @@ type BootstrapConfig struct {
 
 func Bootstrap(config *BootstrapConfig) {
 	// Auto migrate entities
-	if err := config.DB.AutoMigrate(&entity.User{}); err != nil {
+	if err := config.DB.AutoMigrate(&entity.User{}, &entity.PasswordReset{}); err != nil {
 		config.Log.Fatalf("Failed to auto migrate database: %v", err)
 	}
 
 	// Setup repositories
 	userRepository := repository.NewUserRepository(config.Log)
+	passwordResetRepository := repository.NewPasswordResetRepository(config.Log)
+
+	// Setup services
+	mailService := service.NewMailService(config.Config, config.Log)
 
 	// Setup use cases
-	userUseCase := usecase.NewUserUseCase(config.DB, config.Log, config.Validate, config.Config, userRepository)
+	userUseCase := usecase.NewUserUseCase(
+		config.DB,
+		config.Log,
+		config.Validate,
+		config.Config,
+		userRepository,
+		passwordResetRepository,
+		mailService,
+	)
 
 	// Setup controllers
 	userController := http.NewUserController(userUseCase, config.Log)
