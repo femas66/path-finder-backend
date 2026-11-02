@@ -47,20 +47,29 @@ func Bootstrap(config *BootstrapConfig) {
 		passwordResetRepository,
 		mailService,
 	)
+	mahasiswaUseCase := usecase.NewMahasiswaUseCase(config.DB, config.Log, config.Validate, userRepository)
 
 	// Setup controllers
 	userController := http.NewUserController(userUseCase, config.Log)
+	adminMahasiswaController := http.NewAdminMahasiswaController(mahasiswaUseCase, config.Log)
 	hajiCodingController := http.NewHajiCodingController(config.Log)
 
 	// Setup middleware
 	authMiddleware := middleware.NewAuth(config.Config)
+	adminMiddleware := middleware.OnlyAdmin()
+	mitraMiddleware := middleware.OnlyMitra()
+	mahasiswaMiddleware := middleware.OnlyMahasiswa()
 
 	// Setup routes
 	routeConfig := route.RouteConfig{
-		App:                  config.App,
-		UserController:       userController,
-		HajiCodingController: hajiCodingController,
-		AuthMiddleware:       authMiddleware,
+		App:                      config.App,
+		UserController:           userController,
+		AdminMahasiswaController: adminMahasiswaController,
+		HajiCodingController:     hajiCodingController,
+		AuthMiddleware:           authMiddleware,
+		AdminMiddleware:          adminMiddleware,
+		MitraMiddleware:          mitraMiddleware,
+		MahasiswaMiddleware:      mahasiswaMiddleware,
 	}
 	routeConfig.Setup()
 }

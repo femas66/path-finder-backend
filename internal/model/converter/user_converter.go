@@ -7,12 +7,17 @@ import (
 
 func UserToResponse(user *entity.User) *model.UserResponse {
 	return &model.UserResponse{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
+		ID:             user.ID,
+		NIM:            user.NIM,
+		Name:           user.Name,
+		Email:          user.Email,
+		Role:           user.Role,
+		ProfilePicture: user.ProfilePicture,
+		Location:       user.Location,
+		CV:             user.CV,
+		PortfolioURL:   user.PortfolioURL,
+		CreatedAt:      user.CreatedAt,
+		UpdatedAt:      user.UpdatedAt,
 	}
 }
 
