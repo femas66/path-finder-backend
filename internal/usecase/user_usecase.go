@@ -82,12 +82,22 @@ func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserR
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal mengenkripsi password")
 	}
 
+	role := entity.RoleMahasiswa
+	if request.Role != "" {
+		switch request.Role {
+		case entity.RoleAdmin, entity.RoleMitra, entity.RolePerusahaan, entity.RoleMahasiswa:
+			role = request.Role
+		default:
+			return nil, fiber.NewError(fiber.StatusBadRequest, "role tidak valid")
+		}
+	}
+
 	user := &entity.User{
 		ID:       uuid.New().String(),
 		Name:     request.Name,
 		Email:    request.Email,
 		Password: string(hashedPassword),
-		Role:     entity.RoleMahasiswa,
+		Role:     role,
 	}
 
 	if err := u.UserRepository.Create(tx, user); err != nil {
@@ -204,6 +214,86 @@ func (u *UserUseCase) ForgotPassword(ctx context.Context, request *model.ForgotP
 	u.MailService.SendEmailAsync(request.Email, emailSubject, emailBody)
 
 	return converter.UserToForgotPasswordResponse(request.Email), nil
+}
+
+func (u *UserUseCase) Current(ctx context.Context, userID string) (*model.UserResponse, error) {
+	user := new(entity.User)
+	if err := u.UserRepository.FindById(u.DB.WithContext(ctx), user, userID); err != nil {
+		u.Log.Warnf("User not found with id %s: %v", userID, err)
+		return nil, fiber.NewError(fiber.StatusNotFound, "user tidak ditemukan")
+	}
+
+	return converter.UserToResponse(user), nil
+}
+
+func (u *UserUseCase) UpdateCompanyProfile(ctx context.Context, userID string, request *model.UpdateCompanyProfileRequest) (*model.UserResponse, error) {
+	if err := u.Validate.Struct(request); err != nil {
+		u.Log.Warnf("Invalid update company profile request: %v", err)
+		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	user := new(entity.User)
+	if err := u.UserRepository.FindById(u.DB.WithContext(ctx), user, userID); err != nil {
+		u.Log.Warnf("User not found with id %s: %v", userID, err)
+		return nil, fiber.NewError(fiber.StatusNotFound, "user tidak ditemukan")
+	}
+
+	// Pastikan hanya role mitra atau perusahaan yang dapat update
+	if user.Role != entity.RoleMitra && user.Role != entity.RolePerusahaan {
+		return nil, fiber.NewError(fiber.StatusForbidden, "hanya role mitra atau perusahaan yang dapat memperbarui profil perusahaan")
+	}
+
+	if name := request.GetName(); name != "" {
+		user.Name = name
+	}
+	if location := request.GetLocation(); location != "" {
+		user.Location = location
+	}
+	if pic := request.GetProfilePicture(); pic != "" {
+		user.ProfilePicture = pic
+	}
+
+	if err := u.UserRepository.Update(u.DB.WithContext(ctx), user); err != nil {
+		u.Log.Errorf("Failed to update company profile for user %s: %v", userID, err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal memperbarui profil perusahaan")
+	}
+
+	return converter.UserToResponse(user), nil
+}
+
+func (u *UserUseCase) UpdateMahasiswaProfile(ctx context.Context, userID string, request *model.UpdateMahasiswaProfileRequest) (*model.UserResponse, error) {
+	if err := u.Validate.Struct(request); err != nil {
+		u.Log.Warnf("Invalid update mahasiswa profile request: %v", err)
+		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	user := new(entity.User)
+	if err := u.UserRepository.FindById(u.DB.WithContext(ctx), user, userID); err != nil {
+		u.Log.Warnf("User not found with id %s: %v", userID, err)
+		return nil, fiber.NewError(fiber.StatusNotFound, "user tidak ditemukan")
+	}
+
+	// Pastikan hanya role mahasiswa yang dapat update
+	if user.Role != entity.RoleMahasiswa {
+		return nil, fiber.NewError(fiber.StatusForbidden, "hanya role mahasiswa yang dapat memperbarui profil mahasiswa")
+	}
+
+	if pic := request.GetProfilePicture(); pic != "" {
+		user.ProfilePicture = pic
+	}
+	if cv := request.GetCV(); cv != "" {
+		user.CV = cv
+	}
+	if port := request.GetPortfolioURL(); port != "" {
+		user.PortfolioURL = port
+	}
+
+	if err := u.UserRepository.Update(u.DB.WithContext(ctx), user); err != nil {
+		u.Log.Errorf("Failed to update mahasiswa profile for user %s: %v", userID, err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal memperbarui profil mahasiswa")
+	}
+
+	return converter.UserToResponse(user), nil
 }
 
 func generateRandomCode(length int) (string, error) {
