@@ -106,9 +106,9 @@ func OnlyAdmin() fiber.Handler {
 	return RequireRole(entity.RoleAdmin)
 }
 
-// OnlyMitra mengizinkan akses untuk role mitra atau perusahaan
+// OnlyMitra mengizinkan akses hanya untuk role mitra
 func OnlyMitra() fiber.Handler {
-	return RequireRole(entity.RoleMitra, entity.RolePerusahaan)
+	return RequireRole(entity.RoleMitra)
 }
 
 // OnlyMahasiswa mengizinkan akses hanya untuk role mahasiswa

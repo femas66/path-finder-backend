@@ -85,7 +85,7 @@ func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserR
 	role := entity.RoleMahasiswa
 	if request.Role != "" {
 		switch request.Role {
-		case entity.RoleAdmin, entity.RoleMitra, entity.RolePerusahaan, entity.RoleMahasiswa:
+		case entity.RoleAdmin, entity.RoleMitra, entity.RoleMahasiswa:
 			role = request.Role
 		default:
 			return nil, fiber.NewError(fiber.StatusBadRequest, "role tidak valid")
@@ -226,9 +226,9 @@ func (u *UserUseCase) Current(ctx context.Context, userID string) (*model.UserRe
 	return converter.UserToResponse(user), nil
 }
 
-func (u *UserUseCase) UpdateCompanyProfile(ctx context.Context, userID string, request *model.UpdateCompanyProfileRequest) (*model.UserResponse, error) {
+func (u *UserUseCase) UpdateMitraProfile(ctx context.Context, userID string, request *model.UpdateMitraProfileRequest) (*model.UserResponse, error) {
 	if err := u.Validate.Struct(request); err != nil {
-		u.Log.Warnf("Invalid update company profile request: %v", err)
+		u.Log.Warnf("Invalid update mitra profile request: %v", err)
 		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
@@ -238,9 +238,9 @@ func (u *UserUseCase) UpdateCompanyProfile(ctx context.Context, userID string, r
 		return nil, fiber.NewError(fiber.StatusNotFound, "user tidak ditemukan")
 	}
 
-	// Pastikan hanya role mitra atau perusahaan yang dapat update
-	if user.Role != entity.RoleMitra && user.Role != entity.RolePerusahaan {
-		return nil, fiber.NewError(fiber.StatusForbidden, "hanya role mitra atau perusahaan yang dapat memperbarui profil perusahaan")
+	// Pastikan hanya role mitra yang dapat update
+	if user.Role != entity.RoleMitra {
+		return nil, fiber.NewError(fiber.StatusForbidden, "hanya role mitra yang dapat memperbarui profil mitra")
 	}
 
 	if name := request.GetName(); name != "" {
@@ -254,11 +254,15 @@ func (u *UserUseCase) UpdateCompanyProfile(ctx context.Context, userID string, r
 	}
 
 	if err := u.UserRepository.Update(u.DB.WithContext(ctx), user); err != nil {
-		u.Log.Errorf("Failed to update company profile for user %s: %v", userID, err)
-		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal memperbarui profil perusahaan")
+		u.Log.Errorf("Failed to update mitra profile for user %s: %v", userID, err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal memperbarui profil mitra")
 	}
 
 	return converter.UserToResponse(user), nil
+}
+
+func (u *UserUseCase) UpdateCompanyProfile(ctx context.Context, userID string, request *model.UpdateCompanyProfileRequest) (*model.UserResponse, error) {
+	return u.UpdateMitraProfile(ctx, userID, request)
 }
 
 func (u *UserUseCase) UpdateMahasiswaProfile(ctx context.Context, userID string, request *model.UpdateMahasiswaProfileRequest) (*model.UserResponse, error) {
@@ -278,6 +282,9 @@ func (u *UserUseCase) UpdateMahasiswaProfile(ctx context.Context, userID string,
 		return nil, fiber.NewError(fiber.StatusForbidden, "hanya role mahasiswa yang dapat memperbarui profil mahasiswa")
 	}
 
+	if loc := request.GetLocation(); loc != "" {
+		user.Location = loc
+	}
 	if pic := request.GetProfilePicture(); pic != "" {
 		user.ProfilePicture = pic
 	}
