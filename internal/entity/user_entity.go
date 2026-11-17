@@ -5,7 +5,6 @@ import "time"
 const (
 	RoleAdmin      = "admin"
 	RoleMitra      = "mitra"
-	RolePerusahaan = "perusahaan"
 	RoleMahasiswa  = "mahasiswa"
 )
 

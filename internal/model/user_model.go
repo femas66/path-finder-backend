@@ -7,7 +7,7 @@ type RegisterUserRequest struct {
 	Email           string `json:"email" validate:"required,email,max=100"`
 	Password        string `json:"password" validate:"required,min=6,max=100"`
 	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
-	Role            string `json:"role" validate:"omitempty,oneof=admin mitra perusahaan mahasiswa"`
+	Role            string `json:"role" validate:"omitempty,oneof=admin mitra mahasiswa"`
 }
 
 type LoginUserRequest struct {
@@ -29,8 +29,9 @@ type UserResponse struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
-type UpdateCompanyProfileRequest struct {
+type UpdateMitraProfileRequest struct {
 	Name           string `json:"name" validate:"omitempty,min=2,max=150"`
+	NamaMitra      string `json:"nama_mitra" validate:"omitempty,min=2,max=150"`
 	NamaPerusahaan string `json:"nama_perusahaan" validate:"omitempty,min=2,max=150"`
 	Location       string `json:"location" validate:"omitempty,max=255"`
 	Lokasi         string `json:"lokasi" validate:"omitempty,max=255"`
@@ -38,33 +39,47 @@ type UpdateCompanyProfileRequest struct {
 	FotoProfile    string `json:"foto_profile" validate:"omitempty,max=500"`
 }
 
-func (r *UpdateCompanyProfileRequest) GetName() string {
+func (r *UpdateMitraProfileRequest) GetName() string {
+	if r.NamaMitra != "" {
+		return r.NamaMitra
+	}
 	if r.NamaPerusahaan != "" {
 		return r.NamaPerusahaan
 	}
 	return r.Name
 }
 
-func (r *UpdateCompanyProfileRequest) GetLocation() string {
+func (r *UpdateMitraProfileRequest) GetLocation() string {
 	if r.Lokasi != "" {
 		return r.Lokasi
 	}
 	return r.Location
 }
 
-func (r *UpdateCompanyProfileRequest) GetProfilePicture() string {
+func (r *UpdateMitraProfileRequest) GetProfilePicture() string {
 	if r.FotoProfile != "" {
 		return r.FotoProfile
 	}
 	return r.ProfilePicture
 }
 
+type UpdateCompanyProfileRequest = UpdateMitraProfileRequest
+
 type UpdateMahasiswaProfileRequest struct {
+	Location       string `json:"location" validate:"omitempty,max=255"`
+	Lokasi         string `json:"lokasi" validate:"omitempty,max=255"`
 	ProfilePicture string `json:"profile_picture" validate:"omitempty,max=500"`
 	FotoProfile    string `json:"foto_profile" validate:"omitempty,max=500"`
 	CV             string `json:"cv" validate:"omitempty,max=500"`
 	PortfolioURL   string `json:"portfolio_url" validate:"omitempty,max=500"`
 	LinkPortofolio string `json:"link_portofolio" validate:"omitempty,max=500"`
+}
+
+func (r *UpdateMahasiswaProfileRequest) GetLocation() string {
+	if r.Lokasi != "" {
+		return r.Lokasi
+	}
+	return r.Location
 }
 
 func (r *UpdateMahasiswaProfileRequest) GetProfilePicture() string {

@@ -58,15 +58,17 @@ func (c *RouteConfig) SetupAuthRoute() {
 			}
 		}
 
-		// Endpoint khusus role Mitra / Perusahaan
+		// Endpoint khusus role Mitra
 		if c.MitraMiddleware != nil {
 			c.App.Get("/api/mitra/dashboard", c.AuthMiddleware, c.MitraMiddleware, c.UserController.MitraDashboard)
-			c.App.Get("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.Current)
 			c.App.Get("/api/mitra/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.Current)
-			c.App.Put("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateCompanyProfile)
-			c.App.Patch("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateCompanyProfile)
-			c.App.Put("/api/mitra/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateCompanyProfile)
-			c.App.Patch("/api/mitra/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateCompanyProfile)
+			c.App.Put("/api/mitra/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
+			c.App.Patch("/api/mitra/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
+
+			// Alias endpoint perusahaan diarahkan ke mitra
+			c.App.Get("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.Current)
+			c.App.Put("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
+			c.App.Patch("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
 		}
 
 		// Endpoint khusus role Mahasiswa

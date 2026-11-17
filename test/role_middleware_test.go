@@ -74,7 +74,6 @@ func TestRoleMiddlewareAndLogin(t *testing.T) {
 	// 1. Setup user untuk masing-masing role dan verifikasi login
 	adminToken := createAndLoginUser("user-admin-1", "Admin Utama", "admin@pathfinder.com", "admin123", entity.RoleAdmin)
 	mitraToken := createAndLoginUser("user-mitra-1", "PT Teknologi Nusantara", "mitra@tech.com", "mitra123", entity.RoleMitra)
-	perusahaanToken := createAndLoginUser("user-perusahaan-1", "PT Maju Bersama", "hrd@maju.com", "perusahaan123", entity.RolePerusahaan)
 	mahasiswaToken := createAndLoginUser("user-mhs-1", "Budi Mahasiswa", "budi@kampus.ac.id", "mhs12345", entity.RoleMahasiswa)
 
 	// Helper function untuk request GET terproteksi
@@ -96,7 +95,6 @@ func TestRoleMiddlewareAndLogin(t *testing.T) {
 		}{
 			{"admin", adminToken, "admin@pathfinder.com"},
 			{"mitra", mitraToken, "mitra@tech.com"},
-			{"perusahaan", perusahaanToken, "hrd@maju.com"},
 			{"mahasiswa", mahasiswaToken, "budi@kampus.ac.id"},
 		}
 
@@ -123,10 +121,6 @@ func TestRoleMiddlewareAndLogin(t *testing.T) {
 		resp = testProtectedEndpoint("/api/admin/dashboard", mitraToken)
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 
-		// Perusahaan ditolak (403 Forbidden)
-		resp = testProtectedEndpoint("/api/admin/dashboard", perusahaanToken)
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-
 		// Mahasiswa ditolak (403 Forbidden)
 		resp = testProtectedEndpoint("/api/admin/dashboard", mahasiswaToken)
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -136,13 +130,9 @@ func TestRoleMiddlewareAndLogin(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
-	t.Run("Mitra/Perusahaan Middleware - /api/mitra/dashboard", func(t *testing.T) {
+	t.Run("Mitra Middleware - /api/mitra/dashboard", func(t *testing.T) {
 		// Mitra berhasil (200)
 		resp := testProtectedEndpoint("/api/mitra/dashboard", mitraToken)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-		// Perusahaan juga berhasil (200)
-		resp = testProtectedEndpoint("/api/mitra/dashboard", perusahaanToken)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Admin ditolak (403 Forbidden)
@@ -169,10 +159,6 @@ func TestRoleMiddlewareAndLogin(t *testing.T) {
 
 		// Mitra ditolak (403 Forbidden)
 		resp = testProtectedEndpoint("/api/mahasiswa/dashboard", mitraToken)
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-
-		// Perusahaan ditolak (403 Forbidden)
-		resp = testProtectedEndpoint("/api/mahasiswa/dashboard", perusahaanToken)
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 
 		// Tanpa token (401 Unauthorized)

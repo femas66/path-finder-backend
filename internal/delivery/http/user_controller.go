@@ -126,7 +126,7 @@ func (c *UserController) AdminDashboard(ctx fiber.Ctx) error {
 func (c *UserController) MitraDashboard(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[fiber.Map]{
 		Success: true,
-		Message: "Selamat datang di Dashboard Mitra / Perusahaan",
+		Message: "Selamat datang di Dashboard Mitra",
 		Data: fiber.Map{
 			"user_id": ctx.Locals("user_id"),
 			"role":    ctx.Locals("role"),
@@ -147,7 +147,7 @@ func (c *UserController) MahasiswaDashboard(ctx fiber.Ctx) error {
 	})
 }
 
-func (c *UserController) UpdateCompanyProfile(ctx fiber.Ctx) error {
+func (c *UserController) UpdateMitraProfile(ctx fiber.Ctx) error {
 	userID, ok := ctx.Locals("user_id").(string)
 	if !ok || userID == "" {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(model.WebResponse[any]{
@@ -157,9 +157,9 @@ func (c *UserController) UpdateCompanyProfile(ctx fiber.Ctx) error {
 		})
 	}
 
-	request := new(model.UpdateCompanyProfileRequest)
+	request := new(model.UpdateMitraProfileRequest)
 	if err := ctx.Bind().Body(request); err != nil {
-		c.Log.Warnf("Failed to parse update company profile request body: %v", err)
+		c.Log.Warnf("Failed to parse update mitra profile request body: %v", err)
 		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
 			Success: false,
 			Message: "Permintaan tidak valid",
@@ -167,16 +167,20 @@ func (c *UserController) UpdateCompanyProfile(ctx fiber.Ctx) error {
 		})
 	}
 
-	response, err := c.UseCase.UpdateCompanyProfile(ctx.Context(), userID, request)
+	response, err := c.UseCase.UpdateMitraProfile(ctx.Context(), userID, request)
 	if err != nil {
 		return err
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[*model.UserResponse]{
 		Success: true,
-		Message: "Profil perusahaan berhasil diperbarui",
+		Message: "Profil mitra berhasil diperbarui",
 		Data:    response,
 	})
+}
+
+func (c *UserController) UpdateCompanyProfile(ctx fiber.Ctx) error {
+	return c.UpdateMitraProfile(ctx)
 }
 
 func (c *UserController) UpdateMahasiswaProfile(ctx fiber.Ctx) error {
