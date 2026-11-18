@@ -1,6 +1,8 @@
 package config
 
 import (
+	"context"
+
 	"haji-koding/path-finder/internal/delivery/http"
 	"haji-koding/path-finder/internal/delivery/http/middleware"
 	"haji-koding/path-finder/internal/delivery/http/route"
@@ -26,13 +28,22 @@ type BootstrapConfig struct {
 
 func Bootstrap(config *BootstrapConfig) {
 	// Auto migrate entities
-	if err := config.DB.AutoMigrate(&entity.User{}, &entity.PasswordReset{}); err != nil {
+	if err := config.DB.AutoMigrate(
+		&entity.User{},
+		&entity.PasswordReset{},
+		&entity.Story{},
+		&entity.Job{},
+		&entity.Recommendation{},
+	); err != nil {
 		config.Log.Fatalf("Failed to auto migrate database: %v", err)
 	}
 
 	// Setup repositories
 	userRepository := repository.NewUserRepository(config.Log)
 	passwordResetRepository := repository.NewPasswordResetRepository(config.Log)
+	storyRepository := repository.NewStoryRepository(config.Log)
+	jobRepository := repository.NewJobRepository(config.Log)
+	recommendationRepository := repository.NewRecommendationRepository(config.Log)
 
 	// Setup services
 	mailService := service.NewMailService(config.Config, config.Log)
@@ -48,11 +59,34 @@ func Bootstrap(config *BootstrapConfig) {
 		mailService,
 	)
 	mahasiswaUseCase := usecase.NewMahasiswaUseCase(config.DB, config.Log, config.Validate, userRepository)
+	storyUseCase := usecase.NewStoryUseCase(config.DB, config.Log, config.Validate, storyRepository)
+
+	// Leksikon keahlian dipakai mesin rekomendasi untuk mengenali skill dari narasi.
+	skillLexicon, err := usecase.DefaultSkillLexicon()
+	if err != nil {
+		config.Log.Fatalf("Failed to load skill lexicon: %v", err)
+	}
+
+	recommendationUseCase := usecase.NewRecommendationUseCase(
+		config.DB,
+		config.Log,
+		recommendationRepository,
+		jobRepository,
+		storyRepository,
+		skillLexicon,
+	)
+
+	// Katalog lowongan di-seed sekali; kegagalan di sini tidak mematikan server.
+	if err := recommendationUseCase.SeedJobs(context.Background()); err != nil {
+		config.Log.Warnf("Failed to seed job catalog: %v", err)
+	}
 
 	// Setup controllers
 	userController := http.NewUserController(userUseCase, config.Log)
 	adminMahasiswaController := http.NewAdminMahasiswaController(mahasiswaUseCase, config.Log)
 	hajiCodingController := http.NewHajiCodingController(config.Log)
+	storyController := http.NewStoryController(storyUseCase, config.Log)
+	recommendationController := http.NewRecommendationController(recommendationUseCase, config.Log)
 
 	// Setup middleware
 	authMiddleware := middleware.NewAuth(config.Config)
@@ -66,6 +100,8 @@ func Bootstrap(config *BootstrapConfig) {
 		UserController:           userController,
 		AdminMahasiswaController: adminMahasiswaController,
 		HajiCodingController:     hajiCodingController,
+		StoryController:          storyController,
+		RecommendationController: recommendationController,
 		AuthMiddleware:           authMiddleware,
 		AdminMiddleware:          adminMiddleware,
 		MitraMiddleware:          mitraMiddleware,

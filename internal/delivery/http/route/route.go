@@ -11,6 +11,8 @@ type RouteConfig struct {
 	UserController           *http.UserController
 	AdminMahasiswaController *http.AdminMahasiswaController
 	HajiCodingController     *http.HajiCodingController
+	StoryController          *http.StoryController
+	RecommendationController *http.RecommendationController
 	AuthMiddleware           fiber.Handler
 	AdminMiddleware          fiber.Handler
 	MitraMiddleware          fiber.Handler
@@ -69,6 +71,18 @@ func (c *RouteConfig) SetupAuthRoute() {
 			c.App.Get("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.Current)
 			c.App.Put("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
 			c.App.Patch("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
+		}
+
+		// Endpoint cerita diri (semua role yang sudah login)
+		if c.StoryController != nil {
+			c.App.Post("/api/stories", c.AuthMiddleware, c.StoryController.Create)
+			c.App.Get("/api/stories/me", c.AuthMiddleware, c.StoryController.Current)
+		}
+
+		// Endpoint rekomendasi (semua role yang sudah login)
+		if c.RecommendationController != nil {
+			c.App.Post("/api/recommendations", c.AuthMiddleware, c.RecommendationController.Create)
+			c.App.Get("/api/recommendations/me/latest", c.AuthMiddleware, c.RecommendationController.Latest)
 		}
 
 		// Endpoint khusus role Mahasiswa

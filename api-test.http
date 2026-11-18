@@ -1,0 +1,265 @@
+### =====================================================================
+### Path Finder API - manual test
+### Butuh extension VS Code "REST Client" (humao.rest-client).
+### Klik "Send Request" di atas tiap request. Jalankan berurutan dari atas.
+### =====================================================================
+
+@baseUrl = http://localhost:3000
+@password = password123
+
+### 0. Health check
+GET {{baseUrl}}/
+
+### =====================================================================
+### 1. REGISTER (role: admin | mitra | perusahaan | mahasiswa, default mahasiswa)
+### =====================================================================
+
+### Register admin
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Admin Satu",
+  "email": "admin@test.com",
+  "password": "{{password}}",
+  "confirm_password": "{{password}}",
+  "role": "admin"
+}
+
+### Register mitra
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "PT Mitra Jaya",
+  "email": "mitra@test.com",
+  "password": "{{password}}",
+  "confirm_password": "{{password}}",
+  "role": "mitra"
+}
+
+### Register mahasiswa
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Budi Mahasiswa",
+  "email": "mhs@test.com",
+  "password": "{{password}}",
+  "confirm_password": "{{password}}"
+}
+
+### [Negatif] Register email duplikat -> 409
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Budi Lagi",
+  "email": "mhs@test.com",
+  "password": "{{password}}",
+  "confirm_password": "{{password}}"
+}
+
+### [Negatif] Konfirmasi password beda -> 400
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Salah Pass",
+  "email": "salah@test.com",
+  "password": "password123",
+  "confirm_password": "beda12345"
+}
+
+### =====================================================================
+### 2. LOGIN (token disimpan otomatis lewat @name)
+### =====================================================================
+
+# @name loginAdmin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "admin@test.com", "password": "{{password}}" }
+
+###
+# @name loginMitra
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "mitra@test.com", "password": "{{password}}" }
+
+###
+# @name loginMhs
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "mhs@test.com", "password": "{{password}}" }
+
+### [Negatif] Password salah -> 401
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "mhs@test.com", "password": "salahbanget" }
+
+###
+@adminToken = {{loginAdmin.response.body.data.token}}
+@mitraToken = {{loginMitra.response.body.data.token}}
+@mhsToken = {{loginMhs.response.body.data.token}}
+
+### =====================================================================
+### 3. USER LOGIN (semua role)
+### =====================================================================
+
+### Profil user yang login
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{mhsToken}}
+
+### [Negatif] Tanpa token -> 401
+GET {{baseUrl}}/api/auth/me
+
+### =====================================================================
+### 4. FORGOT PASSWORD
+### mail.host di config.json kosong, jadi OTP hanya dicetak di log server
+### ("[MAIL SIMULATOR]"), bukan dikirim ke email.
+### =====================================================================
+
+POST {{baseUrl}}/api/auth/forgot-password
+Content-Type: application/json
+
+{ "email": "mhs@test.com" }
+
+### [Negatif] Email tidak terdaftar -> 404
+POST {{baseUrl}}/api/auth/forgot-password
+Content-Type: application/json
+
+{ "email": "tidakada@test.com" }
+
+### =====================================================================
+### 5. ROLE: MAHASISWA
+### =====================================================================
+
+GET {{baseUrl}}/api/mahasiswa/dashboard
+Authorization: Bearer {{mhsToken}}
+
+###
+PUT {{baseUrl}}/api/mahasiswa/profile
+Authorization: Bearer {{mhsToken}}
+Content-Type: application/json
+
+{
+  "foto_profile": "https://example.com/foto.png",
+  "cv": "https://example.com/cv.pdf",
+  "link_portofolio": "https://github.com/budi"
+}
+
+### [Negatif] Mahasiswa akses dashboard admin -> 403
+GET {{baseUrl}}/api/admin/dashboard
+Authorization: Bearer {{mhsToken}}
+
+### =====================================================================
+### 6. ROLE: MITRA / PERUSAHAAN
+### =====================================================================
+
+GET {{baseUrl}}/api/mitra/dashboard
+Authorization: Bearer {{mitraToken}}
+
+###
+PUT {{baseUrl}}/api/perusahaan/profile
+Authorization: Bearer {{mitraToken}}
+Content-Type: application/json
+
+{
+  "nama_perusahaan": "PT Mitra Jaya Abadi",
+  "lokasi": "Malang",
+  "foto_profile": "https://example.com/logo.png"
+}
+
+### =====================================================================
+### 7. ROLE: ADMIN - CRUD mahasiswa
+### =====================================================================
+
+GET {{baseUrl}}/api/admin/dashboard
+Authorization: Bearer {{adminToken}}
+
+### Tambah mahasiswa (password default = NIM)
+# @name createMhs
+POST {{baseUrl}}/api/admin/mahasiswa
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Siti Aminah",
+  "email": "siti@test.com",
+  "nim": "2241720001"
+}
+
+###
+@mhsId = {{createMhs.response.body.data.id}}
+
+### List + paging + search
+GET {{baseUrl}}/api/admin/mahasiswa?page=1&size=10&search=siti
+Authorization: Bearer {{adminToken}}
+
+### Detail
+GET {{baseUrl}}/api/admin/mahasiswa/{{mhsId}}
+Authorization: Bearer {{adminToken}}
+
+### Update
+PATCH {{baseUrl}}/api/admin/mahasiswa/{{mhsId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "Siti Aminah Updated", "portfolio_url": "https://siti.dev" }
+
+### Mahasiswa baru bisa login pakai NIM sebagai password
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "siti@test.com", "password": "2241720001" }
+
+### [Negatif] NIM duplikat -> 409
+POST {{baseUrl}}/api/admin/mahasiswa
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "Duplikat", "email": "dup@test.com", "nim": "2241720001" }
+
+### Hapus
+DELETE {{baseUrl}}/api/admin/mahasiswa/{{mhsId}}
+Authorization: Bearer {{adminToken}}
+
+### [Negatif] Detail setelah dihapus -> 404
+GET {{baseUrl}}/api/admin/mahasiswa/{{mhsId}}
+Authorization: Bearer {{adminToken}}
+
+### =====================================================================
+### 6. CERITA DIRI (STORY)
+### =====================================================================
+
+### Kirim cerita diri (minimal 50 karakter, maksimal 2000) -> 201
+# @name createStory
+POST {{baseUrl}}/api/stories
+Authorization: Bearer {{mhsToken}}
+Content-Type: application/json
+
+{
+  "content": "Saya adalah mahasiswa yang senang membangun aplikasi mobile. Saya pernah mengerjakan proyek katalog produk dan aplikasi pencatatan keuangan sederhana menggunakan Flutter."
+}
+
+### Ambil cerita terakhir milik sendiri
+GET {{baseUrl}}/api/stories/me
+Authorization: Bearer {{mhsToken}}
+
+### [Negatif] Cerita terlalu pendek -> 400
+POST {{baseUrl}}/api/stories
+Authorization: Bearer {{mhsToken}}
+Content-Type: application/json
+
+{ "content": "terlalu pendek" }
+
+### [Negatif] Tanpa token -> 401
+POST {{baseUrl}}/api/stories
+Content-Type: application/json
+
+{ "content": "Saya adalah mahasiswa yang senang membangun aplikasi mobile dan belajar hal baru setiap hari." }
+
