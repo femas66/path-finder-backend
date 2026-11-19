@@ -59,6 +59,7 @@ func (c *RouteConfig) SetupAuthRoute() {
 		c.App.Get("/api/users/current", c.AuthMiddleware, c.UserController.Current)
 		c.App.Get("/api/users/profile", c.AuthMiddleware, c.UserController.Current)
 		c.App.Get("/api/auth/me", c.AuthMiddleware, c.UserController.Current)
+		c.App.Patch("/api/users/fcm-token", c.AuthMiddleware, c.UserController.UpdateFCMToken)
 
 		// Endpoint khusus role Admin
 		if c.AdminMiddleware != nil {

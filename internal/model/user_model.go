@@ -25,6 +25,7 @@ type UserResponse struct {
 	Location       string    `json:"location,omitempty"`
 	CV             string    `json:"cv,omitempty"`
 	PortfolioURL   string    `json:"portfolio_url,omitempty"`
+	FCMToken       string    `json:"fcm_token,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -115,4 +116,8 @@ type ForgotPasswordResponse struct {
 
 type VerifyUserRequest struct {
 	Token string `validate:"required,max=100"`
+}
+
+type UpdateFCMTokenRequest struct {
+	FCMToken string `json:"fcm_token" validate:"required,min=10,max=500"`
 }

@@ -401,6 +401,62 @@
         "description": "Semua role login: admin, mitra, mahasiswa. Alias profil saat ini. Lookup database gagal dipetakan usecase menjadi 404 \"user tidak ditemukan\"."
       }
     },
+    "/api/users/fcm-token": {
+      "patch": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Perbarui FCM device token",
+        "operationId": "updateUserFCMToken",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFCMTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "FCM token berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateFCMTokenWebResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "FCM token berhasil diperbarui",
+                  "data": null
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Menyimpan atau memperbarui FCM device token untuk pengiriman notifikasi ke perangkat Flutter."
+      }
+    },
     "/api/auth/me": {
       "get": {
         "tags": [
@@ -2418,6 +2474,22 @@
         },
         "description": "PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL. Prioritas nilai nonkosong: lokasi mengalahkan location; foto_profile mengalahkan profile_picture; link_portofolio mengalahkan portfolio_url. Nama/email/NIM tidak dapat diubah melalui endpoint ini."
       },
+      "UpdateFCMTokenRequest": {
+        "type": "object",
+        "properties": {
+          "fcm_token": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "FCM registration token dari perangkat Flutter",
+            "example": "fXyZ1234567890abcdef..."
+          }
+        },
+        "required": [
+          "fcm_token"
+        ],
+        "description": "Payload pembaruan device token Firebase Cloud Messaging."
+      },
       "CreateMahasiswaRequest": {
         "type": "object",
         "properties": {
@@ -2814,6 +2886,29 @@
         ]
       },
       "DeleteMahasiswaWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NullData"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "UpdateFCMTokenWebResponse": {
         "type": "object",
         "properties": {
           "success": {

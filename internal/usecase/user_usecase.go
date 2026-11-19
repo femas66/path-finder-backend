@@ -30,6 +30,7 @@ type UserUseCase struct {
 	UserRepository          *repository.UserRepository
 	PasswordResetRepository *repository.PasswordResetRepository
 	MailService             service.MailService
+	FCMService              service.FCMService
 }
 
 func NewUserUseCase(
@@ -40,8 +41,9 @@ func NewUserUseCase(
 	userRepo *repository.UserRepository,
 	passwordResetRepo *repository.PasswordResetRepository,
 	mailService service.MailService,
+	fcmService ...service.FCMService,
 ) *UserUseCase {
-	return &UserUseCase{
+	uc := &UserUseCase{
 		DB:                      db,
 		Log:                     logger,
 		Validate:                validate,
@@ -50,6 +52,10 @@ func NewUserUseCase(
 		PasswordResetRepository: passwordResetRepo,
 		MailService:             mailService,
 	}
+	if len(fcmService) > 0 {
+		uc.FCMService = fcmService[0]
+	}
+	return uc
 }
 
 func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserRequest) (*model.UserResponse, error) {
@@ -302,6 +308,28 @@ func (u *UserUseCase) UpdateMahasiswaProfile(ctx context.Context, userID string,
 	}
 
 	return converter.UserToResponse(user), nil
+}
+
+func (u *UserUseCase) UpdateFCMToken(ctx context.Context, userID string, request *model.UpdateFCMTokenRequest) error {
+	if err := u.Validate.Struct(request); err != nil {
+		u.Log.Warnf("Invalid update FCM token request: %v", err)
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	user := new(entity.User)
+	if err := u.UserRepository.FindById(u.DB.WithContext(ctx), user, userID); err != nil {
+		u.Log.Warnf("User not found with id %s: %v", userID, err)
+		return fiber.NewError(fiber.StatusNotFound, "user tidak ditemukan")
+	}
+
+	user.FCMToken = request.FCMToken
+	if err := u.UserRepository.Update(u.DB.WithContext(ctx), user); err != nil {
+		u.Log.Errorf("Failed to update FCM token for user %s: %v", userID, err)
+		return fiber.NewError(fiber.StatusInternalServerError, "gagal memperbarui FCM token")
+	}
+
+	u.Log.Infof("FCM token berhasil diperbarui untuk user %s", userID)
+	return nil
 }
 
 func generateRandomCode(length int) (string, error) {
