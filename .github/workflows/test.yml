@@ -42,4 +42,7 @@ jobs:
         run: go mod download
 
       - name: Run Unit Tests
+        env:
+          # Test-only key for the isolated CI database; never use in production.
+          JWT_SECRET: pathfinder-ci-test-only-signing-secret
         run: go test -v -cover ./...

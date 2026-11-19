@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"haji-koding/path-finder/internal/authconfig"
 	"haji-koding/path-finder/internal/entity"
 	"haji-koding/path-finder/internal/model"
 	"haji-koding/path-finder/internal/model/converter"
@@ -53,9 +54,6 @@ func NewUserUseCase(
 }
 
 func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserRequest) (*model.UserResponse, error) {
-	tx := u.DB.WithContext(ctx).Begin()
-	defer tx.Rollback()
-
 	if err := u.Validate.Struct(request); err != nil {
 		u.Log.Warnf("Invalid register request: %v", err)
 		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
@@ -64,6 +62,19 @@ func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserR
 	if request.Password != request.ConfirmPassword {
 		return nil, fiber.NewError(fiber.StatusBadRequest, "konfirmasi password tidak cocok")
 	}
+
+	role := entity.RoleMahasiswa
+	if request.Role != "" {
+		switch request.Role {
+		case entity.RoleMitra, entity.RoleMahasiswa:
+			role = request.Role
+		default:
+			return nil, fiber.NewError(fiber.StatusBadRequest, "role tidak diizinkan untuk registrasi publik")
+		}
+	}
+
+	tx := u.DB.WithContext(ctx).Begin()
+	defer tx.Rollback()
 
 	total, err := u.UserRepository.CountByEmail(tx, request.Email)
 	if err != nil {
@@ -80,16 +91,6 @@ func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserR
 	if err != nil {
 		u.Log.Warnf("Failed to hash password: %v", err)
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal mengenkripsi password")
-	}
-
-	role := entity.RoleMahasiswa
-	if request.Role != "" {
-		switch request.Role {
-		case entity.RoleAdmin, entity.RoleMitra, entity.RoleMahasiswa:
-			role = request.Role
-		default:
-			return nil, fiber.NewError(fiber.StatusBadRequest, "role tidak valid")
-		}
 	}
 
 	user := &entity.User{
@@ -119,8 +120,14 @@ func (u *UserUseCase) Login(ctx context.Context, request *model.LoginUserRequest
 		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
+	secret, err := authconfig.JWTSecret(u.Viper)
+	if err != nil {
+		u.Log.Error(err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "konfigurasi autentikasi tidak tersedia")
+	}
+
 	user := new(entity.User)
-	err := u.UserRepository.FindByEmail(u.DB.WithContext(ctx), user, request.Email)
+	err = u.UserRepository.FindByEmail(u.DB.WithContext(ctx), user, request.Email)
 	if err != nil {
 		u.Log.Warnf("User not found for email %s: %v", request.Email, err)
 		return nil, fiber.NewError(fiber.StatusUnauthorized, "email atau password salah")
@@ -130,11 +137,6 @@ func (u *UserUseCase) Login(ctx context.Context, request *model.LoginUserRequest
 	if err != nil {
 		u.Log.Warnf("Password mismatch for email %s", request.Email)
 		return nil, fiber.NewError(fiber.StatusUnauthorized, "email atau password salah")
-	}
-
-	secret := u.Viper.GetString("jwt.secret")
-	if secret == "" {
-		secret = "super-secret-path-finder-key-2026"
 	}
 
 	expireSeconds := u.Viper.GetInt("jwt.expire")

@@ -3,6 +3,7 @@ package middleware
 import (
 	"strings"
 
+	"haji-koding/path-finder/internal/authconfig"
 	"haji-koding/path-finder/internal/entity"
 	"haji-koding/path-finder/internal/model"
 
@@ -12,6 +13,11 @@ import (
 )
 
 func NewAuth(config *viper.Viper) fiber.Handler {
+	secret, err := authconfig.JWTSecret(config)
+	if err != nil {
+		panic(err)
+	}
+
 	return func(c fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
@@ -26,11 +32,6 @@ func NewAuth(config *viper.Viper) fiber.Handler {
 		tokenString := authHeader
 		if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
 			tokenString = parts[1]
-		}
-
-		secret := "super-secret-path-finder-key-2026"
-		if config != nil && config.GetString("jwt.secret") != "" {
-			secret = config.GetString("jwt.secret")
 		}
 
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
