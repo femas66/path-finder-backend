@@ -334,6 +334,7 @@ func TestJobsAuthorizationOwnershipAndSeedReadOnly(t *testing.T) {
 func TestJobsValidation(t *testing.T) {
 	f := newJobTestFixture(t)
 	created := f.create(t, f.ownerToken, jobTestPayload())
+	beforeInvalidRequests := f.stored(t, created.ID)
 	invalid := []struct {
 		name, field string
 		value       any
@@ -379,7 +380,7 @@ func TestJobsValidation(t *testing.T) {
 	require.Equal(t, created.Title, stored.Title)
 	require.Equal(t, created.RequiredSkills, stored.RequiredSkills)
 	require.Equal(t, created.OptionalSkills, stored.OptionalSkills)
-	require.Equal(t, created.UpdatedAt, stored.UpdatedAt)
+	require.Equal(t, beforeInvalidRequests, stored, "invalid requests must not mutate persisted job")
 	require.EqualValues(t, 1, f.list(t, "/api/mitra/jobs", f.ownerToken).Paging.TotalItem)
 	// Optional fields may be absent, and both HTTP URL schemes are valid.
 	for _, sourceURL := range []string{"", "http://example.org/job", "https://example.org/job"} {
