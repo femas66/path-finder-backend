@@ -57,4 +57,4 @@ atau alat OpenAPI lain.
 Kontrak mencakup endpoint aktif, termasuk alias auth/perusahaan. Dashboard saat
 ini hanya identitas login; lupa password hanya mengirim OTP. Jobs CRUD,
 verifikasi OTP, serta reset password belum didokumentasikan karena belum ada
-route. Rekomendasi masih rule-based di Go, bukan integrasi layanan ML.
+route. Prediksi dan rekomendasi machine learning dikelola di repository service Python terpisah.

@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build application binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/server ./cmd/web
+RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /app/bin/server ./cmd/web
 
 # Final stage
 FROM alpine:latest
@@ -25,6 +25,7 @@ WORKDIR /app
 RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /app/bin/server /app/server
+COPY --from=builder /app/config.json /app/config.json
 
 EXPOSE 3000
 

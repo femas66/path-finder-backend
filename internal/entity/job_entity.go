@@ -2,8 +2,6 @@ package entity
 
 import "time"
 
-// Positions adalah delapan kategori posisi resmi yang dipakai kontrak ML.
-// Nilai category pada tabel jobs wajib salah satu dari daftar ini.
 var Positions = []string{
 	"Software Engineer Intern",
 	"Backend Developer Intern",
@@ -15,7 +13,6 @@ var Positions = []string{
 	"Network & IT Support Intern",
 }
 
-// IsValidPosition memeriksa apakah sebuah kategori termasuk posisi resmi.
 func IsValidPosition(category string) bool {
 	for _, position := range Positions {
 		if position == category {
@@ -25,10 +22,6 @@ func IsValidPosition(category string) bool {
 	return false
 }
 
-// Job adalah katalog lowongan yang dipakai mesin rekomendasi.
-//
-// Daftar skill disimpan sebagai JSON agar tetap terbaca sebagai array
-// tanpa memerlukan tabel relasi tambahan.
 type Job struct {
 	ID             string    `gorm:"column:id;primaryKey"`
 	Title          string    `gorm:"column:title;not null"`

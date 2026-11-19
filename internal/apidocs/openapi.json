@@ -39,10 +39,6 @@
     {
       "name": "Stories",
       "description": "Cerita diri pengguna login semua role."
-    },
-    {
-      "name": "Recommendations",
-      "description": "Rekomendasi pengguna login semua role."
     }
   ],
   "paths": {
@@ -1389,16 +1385,17 @@
           "401": {
             "$ref": "#/components/responses/401"
           },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
           "500": {
             "$ref": "#/components/responses/500"
           }
         },
         "x-roles": [
-          "admin",
-          "mitra",
           "mahasiswa"
         ],
-        "description": "Semua role login: admin, mitra, mahasiswa. Membuat cerita baru, bukan menimpa cerita sebelumnya. Content di-trim; status awal pending. Validasi gagal: \"cerita minimal 50 karakter dan maksimal 2000 karakter\".",
+        "description": "Khusus role login mahasiswa. Role selain mahasiswa menghasilkan 403. Membuat cerita baru, bukan menimpa cerita sebelumnya. Content di-trim; status awal pending. Validasi gagal: \"cerita minimal 50 karakter dan maksimal 2000 karakter\".",
         "requestBody": {
           "required": true,
           "content": {
@@ -1437,49 +1434,8 @@
           "401": {
             "$ref": "#/components/responses/401"
           },
-          "404": {
-            "$ref": "#/components/responses/404"
-          },
-          "500": {
-            "$ref": "#/components/responses/500"
-          }
-        },
-        "x-roles": [
-          "admin",
-          "mitra",
-          "mahasiswa"
-        ],
-        "description": "Semua role login: admin, mitra, mahasiswa. Tidak ada cerita: 404 \"cerita belum pernah dikirim\"."
-      }
-    },
-    "/api/recommendations": {
-      "post": {
-        "tags": [
-          "Recommendations"
-        ],
-        "summary": "Buat rekomendasi dari cerita",
-        "operationId": "createRecommendation",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Rekomendasi berhasil dibuat",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecommendationWebResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/400"
-          },
-          "401": {
-            "$ref": "#/components/responses/401"
+          "403": {
+            "$ref": "#/components/responses/403"
           },
           "404": {
             "$ref": "#/components/responses/404"
@@ -1489,62 +1445,9 @@
           }
         },
         "x-roles": [
-          "admin",
-          "mitra",
           "mahasiswa"
         ],
-        "description": "Semua role login: admin, mitra, mahasiswa. Body opsional. story_id dibatasi pemilik JWT; cerita pengguna lain juga 404 \"cerita tidak ditemukan\". Tanpa cerita: 404 \"cerita belum pernah dikirim, kirim cerita dulu\". top_k di luar 1–8: 400 \"top_k harus bernilai 1 sampai 8\". Cerita tersimpan terlalu pendek: 400 \"cerita terlalu pendek untuk dianalisis\". Katalog kosong: 500 \"katalog lowongan belum tersedia\". Profil tanpa skill tetap sukses dengan status profil_tidak_lengkap dan items=[].",
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRecommendationRequest"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/recommendations/me/latest": {
-      "get": {
-        "tags": [
-          "Recommendations"
-        ],
-        "summary": "Rekomendasi tersimpan terbaru",
-        "operationId": "getLatestRecommendation",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Rekomendasi berhasil diambil",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecommendationWebResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/401"
-          },
-          "404": {
-            "$ref": "#/components/responses/404"
-          },
-          "500": {
-            "$ref": "#/components/responses/500"
-          }
-        },
-        "x-roles": [
-          "admin",
-          "mitra",
-          "mahasiswa"
-        ],
-        "description": "Semua role login: admin, mitra, mahasiswa. Tidak menjalankan analisis ulang. Belum pernah dibuat: 404 \"rekomendasi belum pernah dibuat\"."
+        "description": "Khusus role login mahasiswa. Role selain mahasiswa menghasilkan 403. Tidak ada cerita: 404 \"cerita belum pernah dikirim\"."
       }
     }
   },
@@ -2155,222 +2058,6 @@
           "updated_at"
         ]
       },
-      "CreateRecommendationRequest": {
-        "type": "object",
-        "properties": {
-          "story_id": {
-            "type": "string",
-            "description": "Opsional. ID cerita milik pengguna login; spasi tepi dihapus. Kosong/tidak diisi memakai cerita terbaru. Tidak ada validasi sintaks UUID."
-          },
-          "top_k": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1,
-            "maximum": 8,
-            "default": 3,
-            "description": "Tidak diisi atau null memakai 3. Nilai eksplisit 0 ditolak."
-          }
-        },
-        "description": "Seluruh body opsional; tanpa body atau {} memakai cerita terbaru dan top_k=3."
-      },
-      "RecommendationProfileResponse": {
-        "type": "object",
-        "properties": {
-          "hard_skills": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "soft_skills": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "interests": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "profile_status": {
-            "type": "string",
-            "enum": [
-              "lengkap",
-              "tanpa_skill"
-            ]
-          }
-        },
-        "description": "Daftar kosong selalu [], bukan null. lengkap berarti minimal satu hard skill atau soft skill terdeteksi.",
-        "required": [
-          "hard_skills",
-          "soft_skills",
-          "interests",
-          "profile_status"
-        ]
-      },
-      "RecommendationItemResponse": {
-        "type": "object",
-        "properties": {
-          "job_id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "category": {
-            "type": "string"
-          },
-          "company": {
-            "type": "string"
-          },
-          "location": {
-            "type": "string"
-          },
-          "work_type": {
-            "type": "string"
-          },
-          "source": {
-            "type": "string"
-          },
-          "source_url": {
-            "type": "string",
-            "description": "String dari katalog; bisa kosong, tidak dijamin berformat URL."
-          },
-          "matching_score": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 0,
-            "maximum": 100
-          },
-          "cosine_similarity": {
-            "type": "number",
-            "format": "double",
-            "nullable": true,
-            "description": "Selalu null pada rule-based fallback sekarang (encoder:none)."
-          },
-          "readiness_score": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 0,
-            "maximum": 100
-          },
-          "matched_skills": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "missing_skills": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "score_status": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "skor_belum_tersedia",
-              "persyaratan_belum_tersedia",
-              "profil_tanpa_keterampilan"
-            ]
-          },
-          "rank": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1,
-            "description": "Peringkat mulai 1; null bila matching_score null."
-          }
-        },
-        "description": "Field pointer skor dan rank tetap hadir sebagai null bila tidak tersedia; daftar skill selalu array. Tidak ada endpoint jobs CRUD pada kontrak ini.",
-        "required": [
-          "job_id",
-          "title",
-          "category",
-          "company",
-          "location",
-          "work_type",
-          "source",
-          "source_url",
-          "matching_score",
-          "cosine_similarity",
-          "readiness_score",
-          "matched_skills",
-          "missing_skills",
-          "score_status",
-          "rank"
-        ]
-      },
-      "RecommendationResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "student_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "ID pengguna login, termasuk admin/mitra; nama field mengikuti kontrak ML, bukan pembatas role."
-          },
-          "story_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "generated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "UTC RFC3339."
-          },
-          "schema_version": {
-            "type": "string",
-            "example": "1.0"
-          },
-          "model_version": {
-            "type": "string",
-            "example": "ner:lexicon-rule-1.0.0;encoder:none;ranker:rule-1.0.0"
-          },
-          "top_k": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 8
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "parsial",
-              "profil_tidak_lengkap"
-            ]
-          },
-          "profile": {
-            "$ref": "#/components/schemas/RecommendationProfileResponse"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RecommendationItemResponse"
-            },
-            "maxItems": 8,
-            "description": "Paling banyak top_k; [] bila profil tanpa skill. Jumlah bisa lebih kecil dari top_k."
-          }
-        },
-        "description": "Hasil analisis rule-based tersimpan. profil_tidak_lengkap tetap HTTP 200, bukan error. Katalog kosong menghasilkan HTTP 500 bahkan jika profil tanpa skill.",
-        "required": [
-          "id",
-          "student_id",
-          "story_id",
-          "generated_at",
-          "schema_version",
-          "model_version",
-          "top_k",
-          "status",
-          "profile",
-          "items"
-        ]
-      },
       "VerifyUserRequest": {
         "type": "object",
         "properties": {
@@ -2531,29 +2218,6 @@
           },
           "data": {
             "$ref": "#/components/schemas/StoryResponse"
-          }
-        },
-        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
-        "required": [
-          "success",
-          "message",
-          "data"
-        ]
-      },
-      "RecommendationWebResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "enum": [
-              true
-            ]
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/RecommendationResponse"
           }
         },
         "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
