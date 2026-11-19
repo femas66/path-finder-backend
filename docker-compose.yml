@@ -25,6 +25,8 @@ services:
       dockerfile: Dockerfile
     container_name: path_finder_backend
     restart: unless-stopped
+    environment:
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET before starting backend}"
     ports:
       - "3000:3000"
     depends_on:
