@@ -488,3 +488,29 @@ func TestJobsPaginationAndLiteralFilters(t *testing.T) {
 	require.Equal(t, tieA.ID, first.Data[0].ID)
 	require.Equal(t, tieB.ID, next.Data[0].ID)
 }
+
+func TestJobDeleteProtectedWhenHasActiveApplications(t *testing.T) {
+	f := newJobTestFixture(t)
+	job := f.create(t, f.ownerToken, jobTestPayload())
+
+	appPending := &entity.Application{
+		ID:          "app-del-test-" + uuid.NewString(),
+		JobID:       job.ID,
+		MahasiswaID: f.student.ID,
+		Status:      entity.ApplicationStatusPending,
+	}
+	require.NoError(t, f.db.Create(appPending).Error)
+
+	var resp model.WebResponse[any]
+	f.request(t, "DELETE", "/api/mitra/jobs/"+job.ID, f.ownerToken, nil, 400, &resp)
+	require.Contains(t, resp.Message, "tidak dapat dihapus karena masih memiliki pelamar aktif atau diterima")
+
+	require.NoError(t, f.db.Model(appPending).Update("status", entity.ApplicationStatusAccepted).Error)
+
+	f.request(t, "DELETE", "/api/mitra/jobs/"+job.ID, f.ownerToken, nil, 400, &resp)
+	require.Contains(t, resp.Message, "tidak dapat dihapus karena masih memiliki pelamar aktif atau diterima")
+
+	require.NoError(t, f.db.Model(appPending).Update("status", entity.ApplicationStatusRejected).Error)
+
+	f.request(t, "DELETE", "/api/mitra/jobs/"+job.ID, f.ownerToken, nil, 200, nil)
+}

@@ -2,6 +2,9 @@ package test
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"sync"
 	"testing"
 
 	"haji-koding/path-finder/internal/config"
@@ -10,6 +13,7 @@ import (
 	"haji-koding/path-finder/internal/repository"
 	"haji-koding/path-finder/internal/usecase"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +26,11 @@ func TestApplicationUseCase(t *testing.T) {
 	validate := config.NewValidator()
 
 	require.NoError(t, db.AutoMigrate(&entity.User{}, &entity.Job{}, &entity.Application{}))
+	require.NoError(t, db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_application 
+		ON applications (mahasiswa_id) 
+		WHERE status IN ('pending', 'accepted');
+	`).Error)
 
 	cleanDB := func() {
 		db.Exec("DELETE FROM applications")
@@ -296,5 +305,154 @@ func TestApplicationUseCase(t *testing.T) {
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "final")
+	})
+
+	t.Run("Apply gagal ke lowongan seed tanpa mitra (400)", func(t *testing.T) {
+		seedJob := &entity.Job{
+			ID:       "seed-job-" + uuid.NewString(),
+			MitraID:  nil,
+			Title:    "Catalog Seed Job",
+			Category: "Backend Developer Intern",
+			Company:  "Catalog Company",
+		}
+		require.NoError(t, db.Create(seedJob).Error)
+
+		mhs := &entity.User{
+			ID:             "mhs-seed-" + uuid.NewString(),
+			Name:           "Seed Mhs",
+			Email:          "seedmhs@example.com",
+			Password:       "hashedpassword",
+			Role:           entity.RoleMahasiswa,
+			ProfilePicture: "https://example.com/s.png",
+			CV:             "https://example.com/s.pdf",
+			PortfolioURL:   "https://s.dev",
+		}
+		require.NoError(t, db.Create(mhs).Error)
+
+		_, err := appUseCase.Apply(context.Background(), mhs.ID, &model.ApplyJobRequest{JobID: seedJob.ID})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "tidak menerima pendaftaran langsung")
+	})
+
+	t.Run("Proteksi Concurrency TOCTOU - 5 goroutine Apply paralel hanya 1 yang berhasil", func(t *testing.T) {
+		mhsConcurrent := &entity.User{
+			ID:             "mhs-cnc-" + uuid.NewString(),
+			Name:           "Concurrency Mhs",
+			Email:          "cnc@example.com",
+			Password:       "hashedpassword",
+			Role:           entity.RoleMahasiswa,
+			ProfilePicture: "https://example.com/c.png",
+			CV:             "https://example.com/c.pdf",
+			PortfolioURL:   "https://c.dev",
+		}
+		require.NoError(t, db.Create(mhsConcurrent).Error)
+
+		var testJobs []*entity.Job
+		for i := 0; i < 5; i++ {
+			j := &entity.Job{
+				ID:       fmt.Sprintf("job-cnc-%d-%s", i, uuid.NewString()),
+				MitraID:  &mitraID,
+				Title:    fmt.Sprintf("Concurrent Job %d", i),
+				Category: "Backend Developer Intern",
+				Company:  "PT Maju Bersama",
+			}
+			require.NoError(t, db.Create(j).Error)
+			testJobs = append(testJobs, j)
+		}
+
+		type result struct {
+			resp *model.ApplicationResponse
+			err  error
+		}
+		results := make(chan result, 5)
+
+		var wg sync.WaitGroup
+		wg.Add(5)
+		for i := 0; i < 5; i++ {
+			jobID := testJobs[i].ID
+			go func() {
+				defer wg.Done()
+				r, err := appUseCase.Apply(context.Background(), mhsConcurrent.ID, &model.ApplyJobRequest{JobID: jobID})
+				results <- result{resp: r, err: err}
+			}()
+		}
+		wg.Wait()
+		close(results)
+
+		var successCount int
+		var failCount int
+		for res := range results {
+			if res.err == nil {
+				successCount++
+				assert.NotEmpty(t, res.resp.ID)
+			} else {
+				failCount++
+				var fiberErr *fiber.Error
+				if errors.As(res.err, &fiberErr) {
+					assert.Equal(t, fiber.StatusBadRequest, fiberErr.Code)
+				}
+			}
+		}
+
+		assert.Equal(t, 1, successCount, "Tepat 1 pendaftaran yang harus berhasil")
+		assert.Equal(t, 4, failCount, "4 pendaftaran lainnya harus ditolak")
+	})
+
+	t.Run("Proteksi Atomic Status Transition - pembaruan status bersamaan hanya 1 yang berhasil", func(t *testing.T) {
+		mhsAtomic := &entity.User{
+			ID:             "mhs-atm-" + uuid.NewString(),
+			Name:           "Atomic Mhs",
+			Email:          "atm@example.com",
+			Password:       "hashedpassword",
+			Role:           entity.RoleMahasiswa,
+			ProfilePicture: "https://example.com/a.png",
+			CV:             "https://example.com/a.pdf",
+			PortfolioURL:   "https://a.dev",
+		}
+		require.NoError(t, db.Create(mhsAtomic).Error)
+
+		appResp, err := appUseCase.Apply(context.Background(), mhsAtomic.ID, &model.ApplyJobRequest{JobID: job1.ID})
+		require.NoError(t, err)
+
+		type updateResult struct {
+			status string
+			err    error
+		}
+		results := make(chan updateResult, 2)
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			_, err := appUseCase.UpdateStatus(context.Background(), mitraID, appResp.ID, &model.UpdateApplicationStatusRequest{
+				Status: entity.ApplicationStatusAccepted,
+			})
+			results <- updateResult{status: entity.ApplicationStatusAccepted, err: err}
+		}()
+
+		go func() {
+			defer wg.Done()
+			_, err := appUseCase.UpdateStatus(context.Background(), mitraID, appResp.ID, &model.UpdateApplicationStatusRequest{
+				Status: entity.ApplicationStatusRejected,
+			})
+			results <- updateResult{status: entity.ApplicationStatusRejected, err: err}
+		}()
+
+		wg.Wait()
+		close(results)
+
+		var successCount int
+		var failCount int
+		for res := range results {
+			if res.err == nil {
+				successCount++
+			} else {
+				failCount++
+				assert.Contains(t, res.err.Error(), "final")
+			}
+		}
+
+		assert.Equal(t, 1, successCount, "Tepat 1 pembaruan status yang berhasil")
+		assert.Equal(t, 1, failCount, "Pembaruan kedua harus ditolak karena status sudah final")
 	})
 }

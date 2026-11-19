@@ -112,6 +112,8 @@ func (c *RouteConfig) SetupAuthRoute() {
 			if c.StoryController != nil {
 				c.App.Post("/api/stories", c.AuthMiddleware, c.MahasiswaMiddleware, c.StoryController.Create)
 				c.App.Get("/api/stories/me", c.AuthMiddleware, c.MahasiswaMiddleware, c.StoryController.Current)
+				c.App.Put("/api/stories/:id", c.AuthMiddleware, c.MahasiswaMiddleware, c.StoryController.Update)
+				c.App.Patch("/api/stories/:id", c.AuthMiddleware, c.MahasiswaMiddleware, c.StoryController.Update)
 			}
 		}
 	}

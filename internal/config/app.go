@@ -36,6 +36,15 @@ func Bootstrap(config *BootstrapConfig) {
 		config.Log.Fatalf("Failed to auto migrate database: %v", err)
 	}
 
+	// Partial unique index to protect against concurrency TOCTOU
+	if err := config.DB.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_application 
+		ON applications (mahasiswa_id) 
+		WHERE status IN ('pending', 'accepted');
+	`).Error; err != nil {
+		config.Log.Warnf("Failed to create partial unique index idx_unique_active_application: %v", err)
+	}
+
 	// Setup repositories
 	userRepository := repository.NewUserRepository(config.Log)
 	passwordResetRepository := repository.NewPasswordResetRepository(config.Log)

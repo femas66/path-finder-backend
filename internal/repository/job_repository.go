@@ -75,6 +75,14 @@ func (r *JobRepository) DeleteOwned(db *gorm.DB, id, mitraID string) error {
 	return nil
 }
 
+func (r *JobRepository) CountActiveApplications(db *gorm.DB, jobID string) (int64, error) {
+	var count int64
+	err := db.Model(&entity.Application{}).
+		Where("job_id = ? AND status IN (?, ?)", jobID, entity.ApplicationStatusPending, entity.ApplicationStatusAccepted).
+		Count(&count).Error
+	return count, err
+}
+
 // FindExistingIDs mengembalikan kumpulan ID lowongan yang sudah ada di database.
 func (r *JobRepository) FindExistingIDs(db *gorm.DB, ids []string) (map[string]bool, error) {
 	existing := make(map[string]bool, len(ids))

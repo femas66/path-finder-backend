@@ -69,11 +69,11 @@ type UpdateCompanyProfileRequest = UpdateMitraProfileRequest
 type UpdateMahasiswaProfileRequest struct {
 	Location       string `json:"location" validate:"omitempty,max=255"`
 	Lokasi         string `json:"lokasi" validate:"omitempty,max=255"`
-	ProfilePicture string `json:"profile_picture" validate:"omitempty,max=500"`
-	FotoProfile    string `json:"foto_profile" validate:"omitempty,max=500"`
-	CV             string `json:"cv" validate:"omitempty,max=500"`
-	PortfolioURL   string `json:"portfolio_url" validate:"omitempty,max=500"`
-	LinkPortofolio string `json:"link_portofolio" validate:"omitempty,max=500"`
+	ProfilePicture string `json:"profile_picture" validate:"omitempty,http_url,max=500"`
+	FotoProfile    string `json:"foto_profile" validate:"omitempty,http_url,max=500"`
+	CV             string `json:"cv" validate:"omitempty,http_url,max=500"`
+	PortfolioURL   string `json:"portfolio_url" validate:"omitempty,http_url,max=500"`
+	LinkPortofolio string `json:"link_portofolio" validate:"omitempty,http_url,max=500"`
 }
 
 func (r *UpdateMahasiswaProfileRequest) GetLocation() string {

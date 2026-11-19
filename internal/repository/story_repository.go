@@ -23,7 +23,13 @@ func (r *StoryRepository) FindAllByUserID(db *gorm.DB, stories *[]entity.Story, 
 }
 
 func (r *StoryRepository) FindLatestByUserID(db *gorm.DB, story *entity.Story, userID string) error {
-	return db.Where("user_id = ?", userID).Order("created_at DESC").Take(story).Error
+	return db.Where("user_id = ?", userID).Order("created_at DESC, id DESC").Take(story).Error
+}
+
+func (r *StoryRepository) Update(db *gorm.DB, story *entity.Story) error {
+	return db.Model(story).
+		Select("content", "word_count", "analysis_status", "updated_at").
+		Updates(story).Error
 }
 
 // FindByIDAndUserID mengambil satu cerita tertentu milik pengguna.

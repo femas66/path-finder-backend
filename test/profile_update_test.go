@@ -224,4 +224,42 @@ func TestProfileUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
+
+	t.Run("Update Profile Mahasiswa - Ditolak jika URL menggunakan skema javascript atau tidak valid (400)", func(t *testing.T) {
+		maliciousInputs := []map[string]string{
+			{"cv": "javascript:alert(1)"},
+			{"foto_profile": "javascript:void(0)"},
+			{"link_portofolio": "javascript:alert(document.cookie)"},
+			{"profile_picture": "data:text/html,<script>alert(1)</script>"},
+			{"portfolio_url": "ftp://files.example.com"},
+			{"cv": "not-a-valid-url"},
+		}
+
+		for _, input := range maliciousInputs {
+			bodyBytes, _ := json.Marshal(input)
+			req := httptest.NewRequest(http.MethodPut, "/api/mahasiswa/profile", bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", mahasiswaToken))
+
+			resp, err := app.Test(req)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		}
+	})
+
+	t.Run("Update Profile Mahasiswa - Diterima dengan URL http dan https yang valid (200)", func(t *testing.T) {
+		validInput := map[string]string{
+			"foto_profile":    "https://example.com/photo.png",
+			"cv":              "https://example.com/cv.pdf",
+			"link_portofolio": "http://portfolio.my-domain.id",
+		}
+		bodyBytes, _ := json.Marshal(validInput)
+		req := httptest.NewRequest(http.MethodPut, "/api/mahasiswa/profile", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", mahasiswaToken))
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
 }

@@ -1,6 +1,8 @@
 package http
 
 import (
+	"strconv"
+
 	"haji-koding/path-finder/internal/model"
 	"haji-koding/path-finder/internal/usecase"
 
@@ -79,8 +81,25 @@ func (c *ApplicationController) ListMitra(ctx fiber.Ctx) error {
 		return err
 	}
 
+	page := 1
+	size := 10
+	if ctx.Request().URI().QueryArgs().Has("page") {
+		v, err := strconv.Atoi(ctx.Query("page"))
+		if err != nil || v <= 0 {
+			return fiber.NewError(fiber.StatusBadRequest, "page dan size harus bilangan positif; size maksimal 100")
+		}
+		page = v
+	}
+	if ctx.Request().URI().QueryArgs().Has("size") {
+		v, err := strconv.Atoi(ctx.Query("size"))
+		if err != nil || v <= 0 || v > 100 {
+			return fiber.NewError(fiber.StatusBadRequest, "page dan size harus bilangan positif; size maksimal 100")
+		}
+		size = v
+	}
+
 	jobID := ctx.Query("job_id")
-	response, err := c.UseCase.ListByMitra(ctx.Context(), mitraID, jobID)
+	response, paging, err := c.UseCase.ListByMitra(ctx.Context(), mitraID, jobID, page, size)
 	if err != nil {
 		return err
 	}
@@ -89,6 +108,7 @@ func (c *ApplicationController) ListMitra(ctx fiber.Ctx) error {
 		Success: true,
 		Message: "Daftar pelamar berhasil diambil",
 		Data:    response,
+		Paging:  paging,
 	})
 }
 

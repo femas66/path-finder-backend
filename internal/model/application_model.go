@@ -6,6 +6,12 @@ type ApplyJobRequest struct {
 	JobID string `json:"job_id" validate:"required"`
 }
 
+type ListMitraApplicationRequest struct {
+	JobID string `query:"job_id"`
+	Page  int    `query:"page" validate:"min=1"`
+	Size  int    `query:"size" validate:"min=1,max=100"`
+}
+
 type UpdateApplicationStatusRequest struct {
 	Status string `json:"status" validate:"required,oneof=accepted rejected"`
 }

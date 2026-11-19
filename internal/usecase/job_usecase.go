@@ -221,6 +221,17 @@ func (u *JobUseCase) Update(ctx context.Context, id, mitraID string, request *mo
 }
 
 func (u *JobUseCase) Delete(ctx context.Context, id, mitraID string) error {
+	job := new(entity.Job)
+	if err := u.JobRepository.FindOwned(u.DB.WithContext(ctx), job, id, mitraID); err != nil {
+		return u.jobError(err)
+	}
+	count, err := u.JobRepository.CountActiveApplications(u.DB.WithContext(ctx), id)
+	if err != nil {
+		return u.jobError(err)
+	}
+	if count > 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "lowongan tidak dapat dihapus karena masih memiliki pelamar aktif atau diterima")
+	}
 	if err := u.JobRepository.DeleteOwned(u.DB.WithContext(ctx), id, mitraID); err != nil {
 		return u.jobError(err)
 	}
