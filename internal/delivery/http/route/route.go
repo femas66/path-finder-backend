@@ -1,6 +1,7 @@
 package route
 
 import (
+	"haji-koding/path-finder/internal/apidocs"
 	"haji-koding/path-finder/internal/delivery/http"
 
 	"github.com/gofiber/fiber/v3"
@@ -20,6 +21,7 @@ type RouteConfig struct {
 }
 
 func (c *RouteConfig) Setup() {
+	apidocs.Register(c.App)
 	c.SetupGuestRoute()
 	c.SetupAuthRoute()
 }

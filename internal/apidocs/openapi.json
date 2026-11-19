@@ -1,0 +1,2745 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PathFinder API",
+    "version": "1.0.0",
+    "description": "Kontrak statis backend Go Fiber berdasarkan route, controller, model, dan usecase saat ini. Role admin mengelola mahasiswa; mitra mengelola profil mitra (perusahaan adalah alias); mahasiswa mengelola profil mahasiswa. Semua role login dapat membuat cerita dan rekomendasi. Admin tidak otomatis mewarisi akses role lain. Endpoint alias dipertahankan dengan operationId unik. Endpoint hanya didaftarkan bila controller dan middleware terkait tersedia pada RouteConfig. Tidak mencakup jobs CRUD, verifikasi OTP, atau reset password yang belum memiliki route. Request JSON didokumentasikan; batas format URL/upload tidak ditambahkan karena backend hanya menerima string. Validasi omitempty pada string mengabaikan nilai kosong. Error usecase/controller/middleware memakai WebResponse, data=null, errors string. Error level transport/framework (misalnya body limit/content type) dapat berbeda dari status domain yang tercantum."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Origin deployment saat ini"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Public",
+      "description": "Endpoint tanpa login."
+    },
+    {
+      "name": "Auth",
+      "description": "Registrasi, login, dan pengiriman kode lupa password beserta alias."
+    },
+    {
+      "name": "Users",
+      "description": "Profil login semua role."
+    },
+    {
+      "name": "Admin",
+      "description": "Khusus admin: dashboard dan pengelolaan mahasiswa."
+    },
+    {
+      "name": "Mitra",
+      "description": "Khusus mitra: dashboard dan profil; perusahaan merupakan alias, bukan role."
+    },
+    {
+      "name": "Mahasiswa",
+      "description": "Khusus mahasiswa: dashboard dan profil."
+    },
+    {
+      "name": "Stories",
+      "description": "Cerita diri pengguna login semua role."
+    },
+    {
+      "name": "Recommendations",
+      "description": "Rekomendasi pengguna login semua role."
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "Sapaan backend",
+        "operationId": "getRoot",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "juragansengon88",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RootWebResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "juragansengon88",
+                  "data": "HALO JURAGAN"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Registrasi publik",
+        "operationId": "registerUsers",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Registrasi berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Role default mahasiswa; admin tidak boleh dibuat melalui registrasi publik.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Login",
+        "operationId": "loginUsers",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Login berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Kredensial salah: 401 dengan message/errors \"email atau password salah\". Kirim token hasil login sebagai Authorization: Bearer <token>.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginUserRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/forgot-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Kirim kode lupa password",
+        "operationId": "forgotPasswordUsers",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Kode verifikasi telah dikirim ke email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgotPasswordWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Membuat OTP 6 digit, berlaku 15 menit; menghapus kode lama, mengirim email asinkron. HTTP 200 bukan bukti email berhasil diterima. Email tidak dikenal: 404 \"email tidak ditemukan\". Kode tidak dikembalikan. Belum ada route verifikasi kode atau reset password.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Registrasi publik (alias)",
+        "operationId": "registerAuth",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Registrasi berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Role default mahasiswa; admin tidak boleh dibuat melalui registrasi publik. Alias /api/users dengan handler dan kontrak identik.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Login (alias)",
+        "operationId": "loginAuth",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Login berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Kredensial salah: 401 dengan message/errors \"email atau password salah\". Kirim token hasil login sebagai Authorization: Bearer <token>. Alias /api/users dengan handler dan kontrak identik.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginUserRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Kirim kode lupa password (alias)",
+        "operationId": "forgotPasswordAuth",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Kode verifikasi telah dikirim ke email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgotPasswordWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Membuat OTP 6 digit, berlaku 15 menit; menghapus kode lama, mengirim email asinkron. HTTP 200 bukan bukti email berhasil diterima. Email tidak dikenal: 404 \"email tidak ditemukan\". Kode tidak dikembalikan. Belum ada route verifikasi kode atau reset password. Alias /api/users dengan handler dan kontrak identik.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/current": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Profil pengguna login",
+        "operationId": "getCurrentUser",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil mengambil data pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login: admin, mitra, mahasiswa. Alias profil saat ini. Lookup database gagal dipetakan usecase menjadi 404 \"user tidak ditemukan\"."
+      }
+    },
+    "/api/users/profile": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Profil pengguna login",
+        "operationId": "getUsersProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil mengambil data pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login: admin, mitra, mahasiswa. Alias profil saat ini. Lookup database gagal dipetakan usecase menjadi 404 \"user tidak ditemukan\"."
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Profil pengguna login",
+        "operationId": "getAuthMe",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil mengambil data pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login: admin, mitra, mahasiswa. Alias profil saat ini. Lookup database gagal dipetakan usecase menjadi 404 \"user tidak ditemukan\"."
+      }
+    },
+    "/api/admin/dashboard": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Dashboard admin",
+        "operationId": "getAdminDashboard",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Selamat datang di Dashboard Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "description": "Hanya role admin. Middleware role tidak peka huruf besar/kecil. Mengembalikan claim user_id, role, email dari JWT; tidak membaca database."
+      }
+    },
+    "/api/mitra/dashboard": {
+      "get": {
+        "tags": [
+          "Mitra"
+        ],
+        "summary": "Dashboard mitra",
+        "operationId": "getMitraDashboard",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Selamat datang di Dashboard Mitra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          }
+        },
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Hanya role mitra. Middleware role tidak peka huruf besar/kecil. Mengembalikan claim user_id, role, email dari JWT; tidak membaca database."
+      }
+    },
+    "/api/mahasiswa/dashboard": {
+      "get": {
+        "tags": [
+          "Mahasiswa"
+        ],
+        "summary": "Dashboard mahasiswa",
+        "operationId": "getMahasiswaDashboard",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Selamat datang di Dashboard Mahasiswa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          }
+        },
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Hanya role mahasiswa. Middleware role tidak peka huruf besar/kecil. Mengembalikan claim user_id, role, email dari JWT; tidak membaca database."
+      }
+    },
+    "/api/mitra/profile": {
+      "get": {
+        "tags": [
+          "Mitra"
+        ],
+        "summary": "Ambil profil mitra",
+        "operationId": "getMitraProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil mengambil data pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Hanya role mitra. Middleware role tidak peka huruf besar/kecil. Profil pengguna dari database."
+      },
+      "put": {
+        "tags": [
+          "Mitra"
+        ],
+        "summary": "Perbarui profil mitra",
+        "operationId": "putMitraProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil mitra berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Hanya role mitra. Middleware role tidak peka huruf besar/kecil. Profil pengguna dari database. PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMitraProfileRequest"
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Mitra"
+        ],
+        "summary": "Perbarui profil mitra",
+        "operationId": "patchMitraProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil mitra berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Hanya role mitra. Middleware role tidak peka huruf besar/kecil. Profil pengguna dari database. PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMitraProfileRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/perusahaan/profile": {
+      "get": {
+        "tags": [
+          "Mitra"
+        ],
+        "summary": "Ambil profil perusahaan",
+        "operationId": "getPerusahaanProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil mengambil data pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Hanya role mitra. Middleware role tidak peka huruf besar/kecil. Alias /api/mitra/profile; perusahaan bukan role terpisah."
+      },
+      "put": {
+        "tags": [
+          "Mitra"
+        ],
+        "summary": "Perbarui profil perusahaan",
+        "operationId": "putPerusahaanProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil mitra berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Hanya role mitra. Middleware role tidak peka huruf besar/kecil. Alias /api/mitra/profile; perusahaan bukan role terpisah. PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMitraProfileRequest"
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Mitra"
+        ],
+        "summary": "Perbarui profil perusahaan",
+        "operationId": "patchPerusahaanProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil mitra berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Hanya role mitra. Middleware role tidak peka huruf besar/kecil. Alias /api/mitra/profile; perusahaan bukan role terpisah. PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMitraProfileRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mahasiswa/profile": {
+      "get": {
+        "tags": [
+          "Mahasiswa"
+        ],
+        "summary": "Ambil profil mahasiswa",
+        "operationId": "getMahasiswaProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil mengambil data pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Hanya role mahasiswa. Middleware role tidak peka huruf besar/kecil. Profil pengguna dari database."
+      },
+      "put": {
+        "tags": [
+          "Mahasiswa"
+        ],
+        "summary": "Perbarui profil mahasiswa",
+        "operationId": "putMahasiswaProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil mahasiswa berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Hanya role mahasiswa. Middleware role tidak peka huruf besar/kecil. Profil pengguna dari database. PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMahasiswaProfileRequest"
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Mahasiswa"
+        ],
+        "summary": "Perbarui profil mahasiswa",
+        "operationId": "patchMahasiswaProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil mahasiswa berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Hanya role mahasiswa. Middleware role tidak peka huruf besar/kecil. Profil pengguna dari database. PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMahasiswaProfileRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/mahasiswa": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Tambah mahasiswa",
+        "operationId": "createMahasiswa",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Mahasiswa berhasil ditambahkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MahasiswaWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "description": "Hanya role admin. Middleware role tidak peka huruf besar/kecil. Role selalu mahasiswa. Password awal NIM; email dan NIM harus unik.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMahasiswaRequest"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Daftar mahasiswa",
+        "operationId": "listMahasiswa",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil mengambil daftar mahasiswa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MahasiswaListWebResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Berhasil mengambil daftar mahasiswa",
+                  "data": [],
+                  "paging": {
+                    "page": 1,
+                    "size": 10,
+                    "total_item": 0,
+                    "total_page": 0
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "description": "Hanya role admin. Middleware role tidak peka huruf besar/kecil. Hanya akun role mahasiswa, urut created_at DESC. Data kosong selalu []; total_page=ceil(total_item/size), dapat 0. Halaman melewati hasil tidak menghasilkan 404. page/size dinormalisasi, bukan ditolak.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "description": "Nilai <=0 atau tidak dapat diparse dipulihkan menjadi 1."
+            },
+            "description": "Nilai <=0 atau tidak dapat diparse dipulihkan menjadi 1."
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "description": "Nilai <=0 atau tidak dapat diparse dipulihkan menjadi 10; nilai >100 dibatasi menjadi 100."
+            },
+            "description": "Nilai <=0 atau tidak dapat diparse dipulihkan menjadi 10; nilai >100 dibatasi menjadi 100."
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "description": "Pencarian ILIKE pada name, nim, email. Wildcard SQL % dan _ tidak di-escape."
+            },
+            "description": "Pencarian ILIKE pada name, nim, email. Wildcard SQL % dan _ tidak di-escape."
+          }
+        ]
+      }
+    },
+    "/api/admin/mahasiswa/{id}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Detail mahasiswa",
+        "operationId": "getMahasiswa",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Berhasil mengambil data mahasiswa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MahasiswaWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "description": "Hanya role admin. Middleware role tidak peka huruf besar/kecil.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID mahasiswa. Umumnya UUID; backend tidak memvalidasi sintaks UUID. ID tidak ditemukan atau milik role lain menghasilkan 404."
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Perbarui mahasiswa",
+        "operationId": "putMahasiswaByAdmin",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data mahasiswa berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MahasiswaWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "description": "Hanya role admin. Middleware role tidak peka huruf besar/kecil. PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMahasiswaByAdminRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID mahasiswa. Umumnya UUID; backend tidak memvalidasi sintaks UUID. ID tidak ditemukan atau milik role lain menghasilkan 404."
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Perbarui mahasiswa",
+        "operationId": "patchMahasiswaByAdmin",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data mahasiswa berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MahasiswaWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "description": "Hanya role admin. Middleware role tidak peka huruf besar/kecil. PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMahasiswaByAdminRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID mahasiswa. Umumnya UUID; backend tidak memvalidasi sintaks UUID. ID tidak ditemukan atau milik role lain menghasilkan 404."
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Hapus mahasiswa",
+        "operationId": "deleteMahasiswa",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data mahasiswa berhasil dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteMahasiswaWebResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Data mahasiswa berhasil dihapus",
+                  "data": null
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "description": "Hanya role admin. Middleware role tidak peka huruf besar/kecil.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID mahasiswa. Umumnya UUID; backend tidak memvalidasi sintaks UUID. ID tidak ditemukan atau milik role lain menghasilkan 404."
+          }
+        ]
+      }
+    },
+    "/api/stories": {
+      "post": {
+        "tags": [
+          "Stories"
+        ],
+        "summary": "Simpan cerita diri",
+        "operationId": "createStory",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Cerita berhasil disimpan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login: admin, mitra, mahasiswa. Membuat cerita baru, bukan menimpa cerita sebelumnya. Content di-trim; status awal pending. Validasi gagal: \"cerita minimal 50 karakter dan maksimal 2000 karakter\".",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStoryRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stories/me": {
+      "get": {
+        "tags": [
+          "Stories"
+        ],
+        "summary": "Cerita terbaru pengguna",
+        "operationId": "getLatestStory",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cerita berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login: admin, mitra, mahasiswa. Tidak ada cerita: 404 \"cerita belum pernah dikirim\"."
+      }
+    },
+    "/api/recommendations": {
+      "post": {
+        "tags": [
+          "Recommendations"
+        ],
+        "summary": "Buat rekomendasi dari cerita",
+        "operationId": "createRecommendation",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rekomendasi berhasil dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login: admin, mitra, mahasiswa. Body opsional. story_id dibatasi pemilik JWT; cerita pengguna lain juga 404 \"cerita tidak ditemukan\". Tanpa cerita: 404 \"cerita belum pernah dikirim, kirim cerita dulu\". top_k di luar 1–8: 400 \"top_k harus bernilai 1 sampai 8\". Cerita tersimpan terlalu pendek: 400 \"cerita terlalu pendek untuk dianalisis\". Katalog kosong: 500 \"katalog lowongan belum tersedia\". Profil tanpa skill tetap sukses dengan status profil_tidak_lengkap dan items=[].",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecommendationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recommendations/me/latest": {
+      "get": {
+        "tags": [
+          "Recommendations"
+        ],
+        "summary": "Rekomendasi tersimpan terbaru",
+        "operationId": "getLatestRecommendation",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rekomendasi berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login: admin, mitra, mahasiswa. Tidak menjalankan analisis ulang. Belum pernah dibuat: 404 \"rekomendasi belum pernah dibuat\"."
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Authorization: Bearer <token>. JWT HS256 hasil login; role dari claim role. Middleware juga menerima raw JWT tanpa prefiks, tetapi kontrak standar memakai Bearer. Token hilang/tidak valid/kedaluwarsa menghasilkan 401; role tidak sesuai menghasilkan 403."
+      }
+    },
+    "schemas": {
+      "NullData": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          null
+        ],
+        "description": "Selalu null, bukan string kosong atau objek."
+      },
+      "PageMetadata": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total_item": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "total_page": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "page",
+          "size",
+          "total_item",
+          "total_page"
+        ]
+      },
+      "WebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "description": "Payload sesuai operasi; selalu hadir, termasuk null pada error dan penghapusan."
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          },
+          "errors": {
+            "type": "string",
+            "description": "Pesan error string, bukan objek atau array; dihilangkan pada respons sukses."
+          }
+        },
+        "description": "Envelope model.WebResponse. paging hanya disertakan bila pointer metadata terisi; errors dihilangkan jika kosong.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NullData"
+          },
+          "errors": {
+            "type": "string"
+          }
+        },
+        "description": "Error middleware/controller/usecase: data selalu null; paging tidak dikirim.",
+        "required": [
+          "success",
+          "message",
+          "data",
+          "errors"
+        ]
+      },
+      "RegisterUserRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 100,
+            "format": "password",
+            "writeOnly": true
+          },
+          "confirm_password": {
+            "type": "string",
+            "minLength": 1,
+            "format": "password",
+            "writeOnly": true,
+            "description": "Wajib sama persis dengan password (eqfield=Password); kesamaan lintas field tidak dapat dinyatakan OpenAPI 3.0."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "",
+              "mitra",
+              "mahasiswa"
+            ],
+            "default": "mahasiswa",
+            "description": "Role publik hanya mitra atau mahasiswa; tidak diisi atau string kosong memakai mahasiswa. admin tidak dapat registrasi publik."
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "password",
+          "confirm_password"
+        ]
+      },
+      "LoginUserRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 6,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ForgotPasswordResponse": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nim": {
+            "type": "string",
+            "description": "Dihilangkan jika kosong."
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "mitra",
+              "mahasiswa"
+            ]
+          },
+          "profile_picture": {
+            "type": "string",
+            "description": "Referensi gambar; dihilangkan jika kosong."
+          },
+          "location": {
+            "type": "string",
+            "description": "Dihilangkan jika kosong."
+          },
+          "cv": {
+            "type": "string",
+            "description": "Referensi CV; dihilangkan jika kosong."
+          },
+          "portfolio_url": {
+            "type": "string",
+            "description": "Dihilangkan jika kosong; backend tidak memvalidasi format URL."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT HS256 dengan claims user_id, name, email, role, exp, iat. Masa berlaku jwt.expire detik; fallback 86400 detik."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ]
+      },
+      "DashboardResponse": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Claim user_id; null bila claim tidak ada."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "mitra",
+              "mahasiswa"
+            ],
+            "description": "Claim role; pemeriksaan middleware tidak peka huruf besar/kecil."
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Claim email; null bila claim tidak ada."
+          }
+        },
+        "description": "Data diambil langsung dari JWT, bukan query database. Role normal admin/mitra/mahasiswa; nilai claim diteruskan apa adanya.",
+        "required": [
+          "user_id",
+          "role",
+          "email"
+        ]
+      },
+      "UpdateMitraProfileRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 150,
+            "description": "Nilai kosong diabaikan; nilai nonkosong minimal 2 karakter.",
+            "pattern": "^(?:$|[\\s\\S]{2,})$"
+          },
+          "nama_mitra": {
+            "type": "string",
+            "maxLength": 150,
+            "description": "Nilai kosong diabaikan; nilai nonkosong minimal 2 karakter.",
+            "pattern": "^(?:$|[\\s\\S]{2,})$"
+          },
+          "nama_perusahaan": {
+            "type": "string",
+            "maxLength": 150,
+            "description": "Nilai kosong diabaikan; nilai nonkosong minimal 2 karakter.",
+            "pattern": "^(?:$|[\\s\\S]{2,})$"
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "lokasi": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "profile_picture": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "foto_profile": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "description": "PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL. Prioritas nilai nonkosong: nama_mitra, nama_perusahaan, name; lokasi mengalahkan location; foto_profile mengalahkan profile_picture."
+      },
+      "UpdateCompanyProfileRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UpdateMitraProfileRequest"
+          }
+        ],
+        "description": "Alias Go UpdateCompanyProfileRequest = UpdateMitraProfileRequest; route perusahaan memakai handler mitra."
+      },
+      "UpdateMahasiswaProfileRequest": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "lokasi": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "profile_picture": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "foto_profile": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "cv": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "portfolio_url": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "link_portofolio": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "description": "PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL. Prioritas nilai nonkosong: lokasi mengalahkan location; foto_profile mengalahkan profile_picture; link_portofolio mengalahkan portfolio_url. Nama/email/NIM tidak dapat diubah melalui endpoint ini."
+      },
+      "CreateMahasiswaRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "nim": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 50
+          },
+          "profile_picture": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "cv": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "portfolio_url": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "description": "Admin membuat akun role mahasiswa. Email dan NIM harus unik. Password awal persis NIM; request tidak memiliki field password. Login tetap mensyaratkan password minimal 6 karakter, walaupun NIM minimal 5.",
+        "required": [
+          "name",
+          "email",
+          "nim"
+        ]
+      },
+      "UpdateMahasiswaByAdminRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Nilai kosong diabaikan; nilai nonkosong minimal 3 karakter.",
+            "pattern": "^(?:$|[\\s\\S]{3,})$"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              {
+                "type": "string",
+                "format": "email",
+                "maxLength": 100
+              }
+            ],
+            "description": "Email kosong diabaikan; email nonkosong harus valid dan unik."
+          },
+          "nim": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Nilai kosong diabaikan; nilai nonkosong minimal 5 karakter.",
+            "pattern": "^(?:$|[\\s\\S]{5,})$"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "maxLength": 100,
+            "description": "Nilai kosong diabaikan; nilai nonkosong minimal 6 karakter.",
+            "pattern": "^(?:$|[\\s\\S]{6,})$"
+          },
+          "profile_picture": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "cv": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "portfolio_url": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "description": "PUT dan PATCH sama-sama parsial. Field tidak diisi atau string kosong tidak menghapus nilai lama. Batas panjang berlaku per field sebelum pemilihan alias. Tidak ada upload berkas atau validasi format URL. Email dan NIM baru harus unik. Mengubah NIM tidak otomatis mengubah password."
+      },
+      "MahasiswaResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nim": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "mahasiswa"
+            ]
+          },
+          "profile_picture": {
+            "type": "string",
+            "description": "Referensi gambar; dihilangkan jika kosong."
+          },
+          "cv": {
+            "type": "string",
+            "description": "Referensi CV; dihilangkan jika kosong."
+          },
+          "portfolio_url": {
+            "type": "string",
+            "description": "Dihilangkan jika kosong; backend tidak memvalidasi format URL."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "nim",
+          "name",
+          "email",
+          "role",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "SearchMahasiswaRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "description": "Nilai <=0 atau tidak dapat diparse dipulihkan menjadi 1."
+          },
+          "size": {
+            "type": "integer",
+            "default": 10,
+            "description": "Nilai <=0 atau tidak dapat diparse dipulihkan menjadi 10; nilai >100 dibatasi menjadi 100."
+          },
+          "search": {
+            "type": "string",
+            "default": "",
+            "description": "Pencarian ILIKE pada name, nim, email. Wildcard SQL % dan _ tidak di-escape."
+          }
+        },
+        "description": "Model query, bukan request body. Parameter tidak ditolak saat berada di luar rentang; server menormalisasikannya."
+      },
+      "CreateStoryRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 50,
+            "maxLength": 2000,
+            "description": "strings.TrimSpace dijalankan sebelum validasi panjang Unicode. Word count memakai strings.Fields, bukan batas kata."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "StoryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string"
+          },
+          "word_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "analysis_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "done"
+            ],
+            "description": "pending saat disimpan; done setelah analisis berhasil. Kegagalan update status tidak membatalkan rekomendasi."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "content",
+          "word_count",
+          "analysis_status",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "CreateRecommendationRequest": {
+        "type": "object",
+        "properties": {
+          "story_id": {
+            "type": "string",
+            "description": "Opsional. ID cerita milik pengguna login; spasi tepi dihapus. Kosong/tidak diisi memakai cerita terbaru. Tidak ada validasi sintaks UUID."
+          },
+          "top_k": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 8,
+            "default": 3,
+            "description": "Tidak diisi atau null memakai 3. Nilai eksplisit 0 ditolak."
+          }
+        },
+        "description": "Seluruh body opsional; tanpa body atau {} memakai cerita terbaru dan top_k=3."
+      },
+      "RecommendationProfileResponse": {
+        "type": "object",
+        "properties": {
+          "hard_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "soft_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "profile_status": {
+            "type": "string",
+            "enum": [
+              "lengkap",
+              "tanpa_skill"
+            ]
+          }
+        },
+        "description": "Daftar kosong selalu [], bukan null. lengkap berarti minimal satu hard skill atau soft skill terdeteksi.",
+        "required": [
+          "hard_skills",
+          "soft_skills",
+          "interests",
+          "profile_status"
+        ]
+      },
+      "RecommendationItemResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "work_type": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string",
+            "description": "String dari katalog; bisa kosong, tidak dijamin berformat URL."
+          },
+          "matching_score": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 100
+          },
+          "cosine_similarity": {
+            "type": "number",
+            "format": "double",
+            "nullable": true,
+            "description": "Selalu null pada rule-based fallback sekarang (encoder:none)."
+          },
+          "readiness_score": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 100
+          },
+          "matched_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "score_status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "skor_belum_tersedia",
+              "persyaratan_belum_tersedia",
+              "profil_tanpa_keterampilan"
+            ]
+          },
+          "rank": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Peringkat mulai 1; null bila matching_score null."
+          }
+        },
+        "description": "Field pointer skor dan rank tetap hadir sebagai null bila tidak tersedia; daftar skill selalu array. Tidak ada endpoint jobs CRUD pada kontrak ini.",
+        "required": [
+          "job_id",
+          "title",
+          "category",
+          "company",
+          "location",
+          "work_type",
+          "source",
+          "source_url",
+          "matching_score",
+          "cosine_similarity",
+          "readiness_score",
+          "matched_skills",
+          "missing_skills",
+          "score_status",
+          "rank"
+        ]
+      },
+      "RecommendationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID pengguna login, termasuk admin/mitra; nama field mengikuti kontrak ML, bukan pembatas role."
+          },
+          "story_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC RFC3339."
+          },
+          "schema_version": {
+            "type": "string",
+            "example": "1.0"
+          },
+          "model_version": {
+            "type": "string",
+            "example": "ner:lexicon-rule-1.0.0;encoder:none;ranker:rule-1.0.0"
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "parsial",
+              "profil_tidak_lengkap"
+            ]
+          },
+          "profile": {
+            "$ref": "#/components/schemas/RecommendationProfileResponse"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendationItemResponse"
+            },
+            "maxItems": 8,
+            "description": "Paling banyak top_k; [] bila profil tanpa skill. Jumlah bisa lebih kecil dari top_k."
+          }
+        },
+        "description": "Hasil analisis rule-based tersimpan. profil_tidak_lengkap tetap HTTP 200, bukan error. Katalog kosong menghasilkan HTTP 500 bahkan jika profil tanpa skill.",
+        "required": [
+          "id",
+          "student_id",
+          "story_id",
+          "generated_at",
+          "schema_version",
+          "model_version",
+          "top_k",
+          "status",
+          "profile",
+          "items"
+        ]
+      },
+      "VerifyUserRequest": {
+        "type": "object",
+        "properties": {
+          "Token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "description": "Model internal dengan validate required,max=100, tanpa json tag (nama field Go Token). Tidak digunakan route HTTP saat ini; bukan endpoint verifikasi/reset password.",
+        "required": [
+          "Token"
+        ]
+      },
+      "PageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {},
+            "description": "Generic T; dihilangkan jika slice kosong."
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "description": "Model generic PageResponse[T] tersedia di Go tetapi tidak digunakan controller saat ini. Endpoint daftar memakai WebResponse dengan paging tingkat teratas.",
+        "required": [
+          "paging"
+        ]
+      },
+      "UserWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "LoginWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LoginResponse"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "ForgotPasswordWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ForgotPasswordResponse"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "DashboardWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardResponse"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "MahasiswaWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MahasiswaResponse"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "StoryWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StoryResponse"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "RecommendationWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RecommendationResponse"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "DeleteMahasiswaWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NullData"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "RootWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string",
+            "enum": [
+              "HALO JURAGAN"
+            ]
+          }
+        },
+        "description": "Envelope sukses model.WebResponse; errors dan paging dihilangkan.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "MahasiswaListWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MahasiswaResponse"
+            }
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "description": "Envelope sukses dengan paging tingkat teratas, bukan di dalam data.",
+        "required": [
+          "success",
+          "message",
+          "data",
+          "paging"
+        ]
+      }
+    },
+    "responses": {
+      "400": {
+        "description": "Permintaan tidak valid: body gagal diparse atau validasi gagal.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "Permintaan tidak valid",
+              "data": null,
+              "errors": "Permintaan tidak valid"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "JWT hilang, tidak valid, kedaluwarsa, atau claim identitas tidak tersedia.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "Unauthorized: token tidak valid atau kedaluwarsa",
+              "data": null,
+              "errors": "unauthorized"
+            }
+          }
+        }
+      },
+      "403": {
+        "description": "Role tidak memiliki akses; role admin tidak otomatis boleh mengakses endpoint mitra/mahasiswa.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "Forbidden: role tidak memiliki akses ke resource ini",
+              "data": null,
+              "errors": "forbidden"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Resource tidak ditemukan.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "user tidak ditemukan",
+              "data": null,
+              "errors": "user tidak ditemukan"
+            }
+          }
+        }
+      },
+      "409": {
+        "description": "Email atau NIM sudah digunakan.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "email sudah terdaftar",
+              "data": null,
+              "errors": "email sudah terdaftar"
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "Kesalahan server, database, hashing, konfigurasi JWT, atau katalog rekomendasi.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "terjadi kesalahan pada server",
+              "data": null,
+              "errors": "terjadi kesalahan pada server"
+            }
+          }
+        }
+      }
+    }
+  }
+}
