@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"haji-koding/path-finder/internal/entity"
@@ -74,6 +75,41 @@ func (u *StoryUseCase) Current(ctx context.Context, userID string) (*model.Story
 		}
 		u.Log.Warnf("Failed to find story for user %s: %v", userID, err)
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal mengambil cerita")
+	}
+
+	return converter.StoryToResponse(story), nil
+}
+
+func (u *StoryUseCase) Update(ctx context.Context, userID string, storyID string, request *model.UpdateStoryRequest) (*model.StoryResponse, error) {
+	request.Content = strings.TrimSpace(request.Content)
+
+	if err := u.Validate.Struct(request); err != nil {
+		u.Log.Warnf("Invalid update story request: %v", err)
+		return nil, fiber.NewError(fiber.StatusBadRequest, "cerita minimal 50 karakter dan maksimal 2000 karakter")
+	}
+
+	story := new(entity.Story)
+	var err error
+	if strings.EqualFold(storyID, "me") {
+		err = u.StoryRepository.FindLatestByUserID(u.DB.WithContext(ctx), story, userID)
+	} else {
+		err = u.StoryRepository.FindByIDAndUserID(u.DB.WithContext(ctx), story, storyID, userID)
+	}
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fiber.NewError(fiber.StatusNotFound, "cerita tidak ditemukan")
+		}
+		u.Log.Warnf("Failed to find story %s for user %s: %v", storyID, userID, err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal mencari cerita")
+	}
+
+	story.Content = request.Content
+	story.WordCount = len(strings.Fields(request.Content))
+	story.AnalysisStatus = entity.StoryAnalysisPending
+
+	if err := u.StoryRepository.Update(u.DB.WithContext(ctx), story); err != nil {
+		u.Log.Warnf("Failed to update story %s for user %s: %v", storyID, userID, err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal memperbarui cerita")
 	}
 
 	return converter.StoryToResponse(story), nil

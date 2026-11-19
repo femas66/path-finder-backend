@@ -2,9 +2,11 @@ package config
 
 import (
 	"errors"
+
 	"haji-koding/path-finder/internal/model"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -19,10 +21,17 @@ func NewFiber(config *viper.Viper) *fiber.App {
 				code = e.Code
 			}
 
+			message := "terjadi kesalahan pada server"
+			if code < 500 {
+				message = err.Error()
+			} else {
+				logrus.WithError(err).Error("Internal server error occurred")
+			}
+
 			return ctx.Status(code).JSON(model.WebResponse[any]{
 				Success: false,
-				Message: err.Error(),
-				Errors:  err.Error(),
+				Message: message,
+				Errors:  message,
 			})
 		},
 	})

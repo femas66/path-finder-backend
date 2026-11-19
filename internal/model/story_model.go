@@ -6,6 +6,10 @@ type CreateStoryRequest struct {
 	Content string `json:"content" validate:"required,min=50,max=2000"`
 }
 
+type UpdateStoryRequest struct {
+	Content string `json:"content" validate:"required,min=50,max=2000"`
+}
+
 type StoryResponse struct {
 	ID             string    `json:"id"`
 	UserID         string    `json:"user_id"`

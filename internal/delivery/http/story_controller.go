@@ -73,3 +73,44 @@ func (c *StoryController) Current(ctx fiber.Ctx) error {
 		Data:    response,
 	})
 }
+
+func (c *StoryController) Update(ctx fiber.Ctx) error {
+	userID, ok := ctx.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(model.WebResponse[any]{
+			Success: false,
+			Message: "Unauthorized: pengguna belum terautentikasi",
+			Errors:  "unauthorized",
+		})
+	}
+
+	storyID := ctx.Params("id")
+	if storyID == "" {
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Success: false,
+			Message: "ID cerita tidak boleh kosong",
+			Errors:  "bad request",
+		})
+	}
+
+	request := new(model.UpdateStoryRequest)
+	if err := ctx.Bind().Body(request); err != nil {
+		c.Log.Warnf("Failed to parse update story request body: %v", err)
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Success: false,
+			Message: "Permintaan tidak valid",
+			Errors:  err.Error(),
+		})
+	}
+
+	response, err := c.UseCase.Update(ctx.Context(), userID, storyID, request)
+	if err != nil {
+		return err
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[*model.StoryResponse]{
+		Success: true,
+		Message: "Cerita berhasil diperbarui",
+		Data:    response,
+	})
+}

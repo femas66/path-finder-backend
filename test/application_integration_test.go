@@ -104,6 +104,15 @@ func TestApplicationIntegration(t *testing.T) {
 	}
 	require.NoError(t, db.Create(job2).Error)
 
+	seedJob := &entity.Job{
+		ID:       "seed-job-e2e-" + uuid.NewString(),
+		MitraID:  nil,
+		Title:    "Catalog Only Job",
+		Category: "Software Engineer Intern",
+		Company:  "Catalog Inc",
+	}
+	require.NoError(t, db.Create(seedJob).Error)
+
 	var createdAppID string
 
 	t.Run("Mahasiswa dengan profil belum lengkap gagal melamar (400)", func(t *testing.T) {
@@ -188,6 +197,22 @@ func TestApplicationIntegration(t *testing.T) {
 		assert.Equal(t, createdAppID, webResp.Data[0].ID)
 		assert.NotNil(t, webResp.Data[0].Mahasiswa)
 		assert.Equal(t, "Maya Lengkap", webResp.Data[0].Mahasiswa.Name)
+		assert.NotNil(t, webResp.Paging)
+		assert.Equal(t, 1, webResp.Paging.Page)
+		assert.Equal(t, 10, webResp.Paging.Size)
+		assert.EqualValues(t, 1, webResp.Paging.TotalItem)
+		assert.EqualValues(t, 1, webResp.Paging.TotalPage)
+	})
+
+	t.Run("Mitra melihat daftar pelamar dengan validasi paginasi (400 untuk input invalid)", func(t *testing.T) {
+		for _, q := range []string{"page=0", "size=0", "size=101", "page=abc"} {
+			req := httptest.NewRequest(http.MethodGet, "/api/mitra/applications?"+q, nil)
+			req.Header.Set("Authorization", "Bearer "+mitra1Token)
+
+			resp, err := app.Test(req)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		}
 	})
 
 	t.Run("Mahasiswa melamar ke lowongan yang tidak ada ditolak (404)", func(t *testing.T) {
@@ -286,5 +311,20 @@ func TestApplicationIntegration(t *testing.T) {
 		_ = json.Unmarshal(respBytes, &webResp)
 		assert.False(t, webResp.Success)
 		assert.Contains(t, webResp.Message, "telah diterima")
+	})
+
+	t.Run("Pendaftaran gagal ke lowongan katalog/seed tanpa mitra (400)", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/jobs/%s/apply", seedJob.ID), nil)
+		req.Header.Set("Authorization", "Bearer "+mhsFreshToken)
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		respBytes, _ := io.ReadAll(resp.Body)
+		var webResp model.WebResponse[any]
+		_ = json.Unmarshal(respBytes, &webResp)
+		assert.False(t, webResp.Success)
+		assert.Contains(t, webResp.Message, "tidak menerima pendaftaran langsung")
 	})
 }

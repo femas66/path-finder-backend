@@ -41,11 +41,10 @@ aktif. Test ini tidak menggantikan validator formal OpenAPI atau test kontrak
 respons bisnis. Endpoint dokumentasi dan HEAD otomatis tidak dihitung sebagai
 operasi bisnis. Perubahan kontrak otomatis masuk binary setelah build ulang.
 
-Catatan fixture saat ini: `TestOpenAPIDocumentation` belum memasang
-`JobController` pada `RouteConfig`, sehingga delapan operasi jobs dilaporkan
-sebagai route tidak terdaftar walaupun route produksi sudah ada. Untuk memulihkan
-pemeriksaan kesetaraan, fixture perlu menyertakan `JobController`; jangan
-menghapus operasi jobs dari kontrak untuk meloloskan test tersebut.
+Pemeriksaan kesetaraan pada `TestOpenAPIDocumentation` memasang seluruh controller aktif
+(`UserController`, `AdminMahasiswaController`, `HajiCodingController`, `StoryController`,
+`JobController`, dan `ApplicationController`), memastikan setiap route yang aktif terdaftar
+secara lengkap dan akurat di `openapi.json`.
 
 ## CDN dan akses jaringan
 
@@ -141,9 +140,9 @@ opsional tanpa mengubah field lain, kirim body berikut ke salah satu metode:
 
 ### Catatan migrasi dan snapshot
 
-- Startup menjalankan GORM `AutoMigrate` untuk `jobs`; kolom pemilik `mitra_id`
-  nullable dan berindeks. Pastikan migrasi kolom/index tersebut diterapkan pada
-  database deployment; tidak perlu memberi pemilik pada data seed lama.
+- Startup menjalankan GORM `AutoMigrate` untuk `jobs` dan `applications`.
+- Kolom pemilik `mitra_id` pada `jobs` nullable dan berindeks.
+- Relasi `applications` memiliki foreign key ke `jobs` dan `users` (`mahasiswa_id`) dengan cascade delete (`constraint:OnUpdate:CASCADE,OnDelete:CASCADE`).
 - Lowongan seed/tanpa pemilik tetap `mitra_id: null`: terbaca di katalog, tidak
   muncul pada daftar milik mitra, dan read-only melalui API mitra. Batas input
   create/update tidak diberlakukan ulang pada data seed.
@@ -151,6 +150,99 @@ opsional tanpa mengubah field lain, kirim body berikut ke salah satu metode:
   tersimpan tidak diubah atau dihapus; `job_id` di snapshot dapat menunjuk row
   yang sudah tidak ada, sehingga GET katalog untuk ID tersebut mengembalikan
   `404`. Perubahan lowongan juga tidak menulis ulang snapshot lama.
+
+## Pendaftaran Magang (Applications)
+
+Kontrak lengkap, schema request/response, parameter, dan contoh error tersedia di
+[Swagger UI](http://localhost:3000/docs) (tag **Applications**) dan
+[`internal/apidocs/openapi.json`](internal/apidocs/openapi.json).
+
+### Aturan Bisnis & Validasi
+
+1. **Kelengkapan Profil:**
+   Sebelum mendaftar lowongan magang, mahasiswa wajib melengkapi profil pribadinya:
+   `profile_picture` (foto profil), `cv` (link/berkas CV), dan `portfolio_url` (link portofolio).
+   Jika salah satu atau lebih belum terisi / hanya berupa spasi kosong, server menolak
+   pendaftaran dengan status `400 Bad Request`:
+   `"profil belum lengkap: foto profil, CV, dan link portofolio wajib diisi sebelum mendaftar"`.
+
+2. **Aturan Satu Lamaran Aktif (Single Active Application):**
+   - Ketika mahasiswa sudah mendaftar dan statusnya masih `pending`, mahasiswa tidak
+     dapat mendaftar ke lowongan lain mana pun. Permintaan pendaftaran baru ditolak
+     dengan status `400 Bad Request`:
+     `"anda masih memiliki pendaftaran magang aktif yang sedang diproses"`.
+   - Jika status pendaftaran ditolak (`rejected`) oleh pihak mitra, mahasiswa
+     diperbolehkan mendaftar kembali ke lowongan lain.
+   - Jika status pendaftaran diterima (`accepted`) oleh mitra, mahasiswa tidak dapat
+     mendaftar ke lowongan manapun lagi secara permanen dengan status `400 Bad Request`:
+     `"anda telah diterima di program magang lain dan tidak dapat mendaftar lagi"`.
+
+3. **Otorisasi & Keamanan Status:**
+   - Hanya role `mahasiswa` yang dapat mengajukan pendaftaran magang (role lain menghasilkan `403 Forbidden`).
+   - Hanya role `mitra` pemilik lowongan yang dapat melihat pelamar dan mengubah status pendaftaran
+     (mitra lain menghasilkan `403 Forbidden`).
+   - Terminal status guard: Status pendaftaran yang sudah final (`accepted` atau `rejected`)
+     tidak dapat diubah kembali (`400 Bad Request` - `"status lamaran sudah final dan tidak dapat diubah lagi"`).
+
+4. **Lowongan Tanpa Mitra (Seed/Katalog):**
+   - Lowongan katalog/seed awal yang tidak terikat dengan akun mitra (`mitra_id` bernilai null atau kosong) tidak menerima pendaftaran langsung melalui platform (`400 Bad Request` - `"lowongan ini tidak menerima pendaftaran langsung melalui platform"`).
+
+### Endpoint Mahasiswa
+
+- `POST /api/jobs/{id}/apply`: Mendaftar lowongan dengan ID lowongan di path parameter URL.
+- `POST /api/mahasiswa/applications`: Mendaftar lowongan menggunakan request body JSON:
+  ```json
+  {
+    "job_id": "018f-uuid-lowongan"
+  }
+  ```
+- `GET /api/mahasiswa/applications`: Mengambil seluruh riwayat pendaftaran magang milik mahasiswa
+  yang sedang login beserta detail relasi lowongan yang dilamar.
+
+### Endpoint Mitra
+
+- `GET /api/mitra/applications`: Mengambil daftar pelamar untuk lowongan yang dimiliki oleh
+  mitra yang sedang login, dilengkapi objek `mahasiswa` (`MahasiswaApplicant`), objek `job`, dan metadata `paging` (`PageMetadata`).
+  Mendukung query parameter:
+  - `job_id`: filter opsional berdasarkan ID lowongan.
+  - `page`: nomor halaman (default `1`, integer positif).
+  - `size`: jumlah data per halaman (default `10`, minimal `1`, maksimal `100`).
+  Nilai `page` atau `size` yang tidak valid (non-integer, <= 0, atau size > 100) menghasilkan respons `400 Bad Request`.
+- `PATCH /api/mitra/applications/{id}/status` & `PUT /api/mitra/applications/{id}/status`:
+  Memperbarui status lamaran pelamar.
+  Contoh body:
+  ```json
+  {
+    "status": "accepted"
+  }
+  ```
+  Nilai `status` yang diizinkan hanya `"accepted"` atau `"rejected"`.
+
+---
+
+## Stories: Cerita Diri & Pembaruan Cerita
+
+Kontrak lengkap tersedia di [Swagger UI](http://localhost:3000/docs) (tag **Stories**) dan
+[`internal/apidocs/openapi.json`](internal/apidocs/openapi.json).
+
+- `POST /api/stories`: Mengirim cerita diri baru. Khusus role `mahasiswa`.
+- `GET /api/stories/me`: Mengambil cerita diri terbaru milik mahasiswa yang login.
+- `PUT /api/stories/{id}` & `PATCH /api/stories/{id}`:
+  Memperbarui isi cerita jika mahasiswa melakukan kesalahan/typo dalam input cerita diri.
+  - Path parameter `{id}` menerima ID cerita (UUID) atau keyword `"me"` untuk secara langsung
+    memperbarui cerita terbaru pengguna.
+  - Body request:
+    ```json
+    {
+      "content": "Isi cerita diri hasil revisi yang mendeskripsikan minat, pengalaman, dan keahlian secara komprehensif..."
+    }
+    ```
+  - Validasi: `content` di-trim secara otomatis; panjang minimal 50 karakter dan maksimal 2000 karakter
+    (`400 Bad Request` jika tidak memenuhi).
+  - Server otomatis menghitung ulang `word_count` dan mereset `analysis_status` menjadi `"pending"`
+    agar dapat dianalisis ulang.
+  - Otorisasi: Khusus role `mahasiswa`. Cerita milik pengguna lain atau ID tidak ditemukan menghasilkan
+    `404 Not Found`.
 
 ## Batas cakupan
 

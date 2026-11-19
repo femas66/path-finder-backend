@@ -43,6 +43,10 @@
     {
       "name": "Jobs",
       "description": "Katalog lowongan untuk semua role login; CRUD milik mitra saja. Lowongan seed tanpa pemilik hanya dapat dibaca."
+    },
+    {
+      "name": "Applications",
+      "description": "Pendaftaran lowongan magang oleh mahasiswa dan pengelolaan status oleh mitra pemilik lowongan."
     }
   ],
   "paths": {
@@ -2091,6 +2095,487 @@
           }
         ]
       }
+    },
+    "/api/stories/{id}": {
+      "put": {
+        "tags": [
+          "Stories"
+        ],
+        "summary": "Perbarui cerita diri (PUT)",
+        "operationId": "updateStoryPut",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Khusus role login mahasiswa. Memperbarui cerita diri berdasarkan ID cerita atau keyword 'me' untuk cerita terbaru pengguna. Minimal 50 dan maksimal 2000 karakter setelah di-trim. Status analisis di-reset ke pending dan word_count dihitung ulang.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID cerita (UUID) atau 'me' untuk cerita terbaru pengguna."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cerita berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Stories"
+        ],
+        "summary": "Perbarui cerita diri (PATCH)",
+        "operationId": "updateStoryPatch",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Khusus role login mahasiswa. Memperbarui cerita diri berdasarkan ID cerita atau keyword 'me' untuk cerita terbaru pengguna. Minimal 50 dan maksimal 2000 karakter setelah di-trim. Status analisis di-reset ke pending dan word_count dihitung ulang.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID cerita (UUID) atau 'me' untuk cerita terbaru pengguna."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cerita berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/api/jobs/{id}/apply": {
+      "post": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Daftar lowongan magang via URL",
+        "operationId": "applyJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Khusus role mahasiswa. Wajib melengkapi profil (foto profil, CV, dan link portofolio). Hanya boleh memiliki satu lamaran aktif (pending/accepted). Menghasilkan 400 jika profil belum lengkap atau sudah memiliki lamaran aktif/diterima.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID lowongan magang."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Pendaftaran magang berhasil diajukan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/api/mahasiswa/applications": {
+      "post": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Daftar lowongan magang via body",
+        "operationId": "createMahasiswaApplication",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Khusus role mahasiswa. Wajib melengkapi profil (foto profil, CV, dan link portofolio). Hanya boleh memiliki satu lamaran aktif (pending/accepted).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pendaftaran magang berhasil diajukan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Daftar lamaran magang milik mahasiswa yang login",
+        "operationId": "listMahasiswaApplications",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mahasiswa"
+        ],
+        "description": "Khusus role mahasiswa. Mengambil seluruh riwayat pendaftaran magang yang pernah diajukan oleh mahasiswa login beserta relasi lowongan.",
+        "responses": {
+          "200": {
+            "description": "Daftar pendaftaran magang berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationsWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/api/mitra/applications": {
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Daftar pelamar magang untuk lowongan milik mitra",
+        "operationId": "listMitraApplications",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus role mitra. Mengambil seluruh pelamar pada lowongan-lowongan milik mitra yang sedang login beserta relasi data mahasiswa dan lowongan. Mendukung paginasi page dan size serta filter job_id.",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "description": "Filter opsional berdasarkan ID lowongan.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Nomor halaman (default 1). Nilai harus integer positif (min 1).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "Jumlah data per halaman (default 10, max 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar pelamar magang berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MitraApplicationsWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/api/mitra/applications/{id}/status": {
+      "patch": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Perbarui status lamaran magang (PATCH)",
+        "operationId": "patchMitraApplicationStatus",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus role mitra pemilik lowongan. Memperbarui status pelamar menjadi 'accepted' atau 'rejected'. Jika status saat ini sudah final (accepted/rejected), menghasilkan 400.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID pendaftaran magang."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApplicationStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status pendaftaran berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Perbarui status lamaran magang (PUT)",
+        "operationId": "putMitraApplicationStatus",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus role mitra pemilik lowongan. Memperbarui status pelamar menjadi 'accepted' atau 'rejected'. Jika status saat ini sudah final (accepted/rejected), menghasilkan 400.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID pendaftaran magang."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApplicationStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status pendaftaran berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3295,6 +3780,202 @@
           "data"
         ],
         "description": "Envelope model.WebResponse; errors dihilangkan. paging dihilangkan."
+      },
+      "UpdateStoryRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 50,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "description": "Cerita diri mahasiswa yang diperbarui; di-trim sebelum validasi."
+      },
+      "ApplyJobRequest": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "description": "ID lowongan magang yang didaftar."
+      },
+      "UpdateApplicationStatusRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "Status akhir pelamar magang: accepted atau rejected."
+      },
+      "MahasiswaApplicant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nim": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "profile_picture": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "cv": {
+            "type": "string"
+          },
+          "portfolio_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email"
+        ]
+      },
+      "ApplicationResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobResponse"
+          },
+          "mahasiswa_id": {
+            "type": "string"
+          },
+          "mahasiswa": {
+            "$ref": "#/components/schemas/MahasiswaApplicant"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "mahasiswa_id",
+          "status",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "ApplicationWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ApplicationResponse"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "ApplicationsWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplicationResponse"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "MitraApplicationsWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplicationResponse"
+            }
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "data",
+          "paging"
+        ]
       }
     },
     "responses": {
