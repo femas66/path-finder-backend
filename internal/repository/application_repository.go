@@ -31,7 +31,9 @@ func (r *ApplicationRepository) ListByMahasiswaID(db *gorm.DB, apps *[]entity.Ap
 }
 
 func (r *ApplicationRepository) ListByMitraID(db *gorm.DB, apps *[]entity.Application, mitraID string, jobID string) error {
-	query := db.Joins("JOIN jobs ON jobs.id = applications.job_id").
+	query := db.Model(&entity.Application{}).
+		Select("applications.*").
+		Joins("JOIN jobs ON jobs.id = applications.job_id").
 		Where("jobs.mitra_id = ?", mitraID).
 		Preload("Job").
 		Preload("Mahasiswa")

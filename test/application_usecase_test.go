@@ -241,4 +241,56 @@ func TestApplicationUseCase(t *testing.T) {
 		})
 		assert.Error(t, err)
 	})
+
+	t.Run("Apply gagal jika lowongan tidak ditemukan (404)", func(t *testing.T) {
+		mhsValid := &entity.User{
+			ID:             "mhs-404-" + uuid.NewString(),
+			Name:           "Valid Mhs",
+			Email:          "valid404@example.com",
+			Password:       "hashedpassword",
+			Role:           entity.RoleMahasiswa,
+			ProfilePicture: "https://example.com/v.png",
+			CV:             "https://example.com/v.pdf",
+			PortfolioURL:   "https://v.dev",
+		}
+		require.NoError(t, db.Create(mhsValid).Error)
+
+		_, err := appUseCase.Apply(context.Background(), mhsValid.ID, &model.ApplyJobRequest{JobID: "non-existent-job-id"})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "tidak ditemukan")
+	})
+
+	t.Run("Apply gagal jika user bukan role mahasiswa (403)", func(t *testing.T) {
+		_, err := appUseCase.Apply(context.Background(), mitraID, &model.ApplyJobRequest{JobID: job1.ID})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Hanya mahasiswa")
+	})
+
+	t.Run("UpdateStatus gagal jika status sudah final (bukan pending)", func(t *testing.T) {
+		mhsFinal := &entity.User{
+			ID:             "mhs-fnl-" + uuid.NewString(),
+			Name:           "Final Mhs",
+			Email:          "final@example.com",
+			Password:       "hashedpassword",
+			Role:           entity.RoleMahasiswa,
+			ProfilePicture: "https://example.com/f.png",
+			CV:             "https://example.com/f.pdf",
+			PortfolioURL:   "https://f.dev",
+		}
+		require.NoError(t, db.Create(mhsFinal).Error)
+
+		appResp, err := appUseCase.Apply(context.Background(), mhsFinal.ID, &model.ApplyJobRequest{JobID: job1.ID})
+		require.NoError(t, err)
+
+		_, err = appUseCase.UpdateStatus(context.Background(), mitraID, appResp.ID, &model.UpdateApplicationStatusRequest{
+			Status: entity.ApplicationStatusAccepted,
+		})
+		require.NoError(t, err)
+
+		_, err = appUseCase.UpdateStatus(context.Background(), mitraID, appResp.ID, &model.UpdateApplicationStatusRequest{
+			Status: entity.ApplicationStatusRejected,
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "final")
+	})
 }

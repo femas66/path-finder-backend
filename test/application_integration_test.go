@@ -74,11 +74,13 @@ func TestApplicationIntegration(t *testing.T) {
 	mitra2ID := "mitra-e2e-2-" + uuid.NewString()
 	mhsIncompleteID := "mhs-e2e-inc-" + uuid.NewString()
 	mhsCompleteID := "mhs-e2e-ok-" + uuid.NewString()
+	mhsFreshID := "mhs-e2e-fresh-" + uuid.NewString()
 
 	mitra1Token := createAndLogin(mitra1ID, "PT Solusi Cloud", "cloud@mitra.com", "pass123", entity.RoleMitra, "https://cloud.com/logo.png", "", "")
 	mitra2Token := createAndLogin(mitra2ID, "PT Inovasi AI", "ai@mitra.com", "pass123", entity.RoleMitra, "https://ai.com/logo.png", "", "")
 	mhsIncompleteToken := createAndLogin(mhsIncompleteID, "Dodi Belum Lengkap", "dodi@mhs.ac.id", "pass123", entity.RoleMahasiswa, "", "", "")
 	mhsCompleteToken := createAndLogin(mhsCompleteID, "Maya Lengkap", "maya@mhs.ac.id", "pass123", entity.RoleMahasiswa, "https://pic.me/maya.png", "https://cv.me/maya.pdf", "https://portfolio.me/maya")
+	mhsFreshToken := createAndLogin(mhsFreshID, "Fresh Mahasiswa", "fresh@mhs.ac.id", "pass123", entity.RoleMahasiswa, "https://pic.me/f.png", "https://cv.me/f.pdf", "https://portfolio.me/f")
 
 	job1 := &entity.Job{
 		ID:       "job-e2e-1-" + uuid.NewString(),
@@ -179,8 +181,27 @@ func TestApplicationIntegration(t *testing.T) {
 		require.NoError(t, json.Unmarshal(respBytes, &webResp))
 		assert.True(t, webResp.Success)
 		assert.NotEmpty(t, webResp.Data)
+		assert.Equal(t, createdAppID, webResp.Data[0].ID)
 		assert.NotNil(t, webResp.Data[0].Mahasiswa)
 		assert.Equal(t, "Maya Lengkap", webResp.Data[0].Mahasiswa.Name)
+	})
+
+	t.Run("Mahasiswa melamar ke lowongan yang tidak ada ditolak (404)", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/jobs/non-existent-job-uuid/apply", nil)
+		req.Header.Set("Authorization", "Bearer "+mhsFreshToken)
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+
+	t.Run("Non-mahasiswa (Mitra) mencoba melamar lowongan ditolak (403)", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/jobs/%s/apply", job1.ID), nil)
+		req.Header.Set("Authorization", "Bearer "+mitra1Token)
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 
 	t.Run("Mitra lain dilarang mengubah status pelamar pada lowongan ini (403)", func(t *testing.T) {

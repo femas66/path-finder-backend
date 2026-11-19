@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"time"
 
 	"haji-koding/path-finder/internal/entity"
 	"haji-koding/path-finder/internal/model"
@@ -44,12 +46,13 @@ func NewApplicationUseCase(
 }
 
 func (c *ApplicationUseCase) Apply(ctx context.Context, mahasiswaID string, request *model.ApplyJobRequest) (*model.ApplicationResponse, error) {
+	request.JobID = strings.TrimSpace(request.JobID)
 	if err := c.Validate.Struct(request); err != nil {
 		return nil, fiber.NewError(fiber.StatusBadRequest, "Permintaan tidak valid")
 	}
 
 	user := new(entity.User)
-	if err := c.UserRepository.FindById(c.DB, user, mahasiswaID); err != nil {
+	if err := c.UserRepository.FindById(c.DB.WithContext(ctx), user, mahasiswaID); err != nil {
 		return nil, fiber.NewError(fiber.StatusNotFound, "Pengguna tidak ditemukan")
 	}
 
@@ -62,7 +65,10 @@ func (c *ApplicationUseCase) Apply(ctx context.Context, mahasiswaID string, requ
 	}
 
 	activeApp := new(entity.Application)
-	err := c.ApplicationRepository.FindActiveByMahasiswaID(c.DB, activeApp, mahasiswaID)
+	err := c.ApplicationRepository.FindActiveByMahasiswaID(c.DB.WithContext(ctx), activeApp, mahasiswaID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal memeriksa status lamaran")
+	}
 	if err == nil && activeApp.ID != "" {
 		if activeApp.Status == entity.ApplicationStatusAccepted {
 			return nil, fiber.NewError(fiber.StatusBadRequest, "Anda telah diterima di lowongan magang dan tidak dapat mendaftar lagi")
@@ -73,29 +79,29 @@ func (c *ApplicationUseCase) Apply(ctx context.Context, mahasiswaID string, requ
 	}
 
 	job := new(entity.Job)
-	if err := c.JobRepository.FindById(c.DB, job, request.JobID); err != nil {
+	if err := c.JobRepository.FindById(c.DB.WithContext(ctx), job, request.JobID); err != nil {
 		return nil, fiber.NewError(fiber.StatusNotFound, "Lowongan tidak ditemukan")
 	}
 
 	app := &entity.Application{
 		ID:          uuid.NewString(),
 		JobID:       job.ID,
-		Job:         job,
 		MahasiswaID: user.ID,
-		Mahasiswa:   user,
 		Status:      entity.ApplicationStatusPending,
 	}
 
-	if err := c.ApplicationRepository.Create(c.DB, app); err != nil {
+	if err := c.ApplicationRepository.Create(c.DB.WithContext(ctx), app); err != nil {
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal menyimpan pendaftaran magang")
 	}
 
+	app.Job = job
+	app.Mahasiswa = user
 	return converter.ApplicationToResponse(app), nil
 }
 
 func (c *ApplicationUseCase) ListByMahasiswa(ctx context.Context, mahasiswaID string) ([]model.ApplicationResponse, error) {
 	var apps []entity.Application
-	if err := c.ApplicationRepository.ListByMahasiswaID(c.DB, &apps, mahasiswaID); err != nil {
+	if err := c.ApplicationRepository.ListByMahasiswaID(c.DB.WithContext(ctx), &apps, mahasiswaID); err != nil {
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal mengambil daftar lamaran")
 	}
 	return converter.ApplicationsToResponses(apps), nil
@@ -103,7 +109,7 @@ func (c *ApplicationUseCase) ListByMahasiswa(ctx context.Context, mahasiswaID st
 
 func (c *ApplicationUseCase) ListByMitra(ctx context.Context, mitraID string, jobID string) ([]model.ApplicationResponse, error) {
 	var apps []entity.Application
-	if err := c.ApplicationRepository.ListByMitraID(c.DB, &apps, mitraID, jobID); err != nil {
+	if err := c.ApplicationRepository.ListByMitraID(c.DB.WithContext(ctx), &apps, mitraID, jobID); err != nil {
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal mengambil daftar pelamar")
 	}
 	return converter.ApplicationsToResponses(apps), nil
@@ -119,7 +125,7 @@ func (c *ApplicationUseCase) UpdateStatus(ctx context.Context, mitraID string, a
 	}
 
 	app := new(entity.Application)
-	if err := c.ApplicationRepository.FindByIDWithRelations(c.DB, app, applicationID); err != nil {
+	if err := c.ApplicationRepository.FindByIDWithRelations(c.DB.WithContext(ctx), app, applicationID); err != nil {
 		return nil, fiber.NewError(fiber.StatusNotFound, "Lamaran tidak ditemukan")
 	}
 
@@ -127,10 +133,15 @@ func (c *ApplicationUseCase) UpdateStatus(ctx context.Context, mitraID string, a
 		return nil, fiber.NewError(fiber.StatusForbidden, "Anda tidak memiliki izin untuk mengelola pelamar pada lowongan ini")
 	}
 
-	if err := c.ApplicationRepository.UpdateStatus(c.DB, applicationID, request.Status); err != nil {
+	if app.Status != entity.ApplicationStatusPending {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "Status lamaran sudah final dan tidak dapat diubah lagi")
+	}
+
+	if err := c.ApplicationRepository.UpdateStatus(c.DB.WithContext(ctx), applicationID, request.Status); err != nil {
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal memperbarui status lamaran")
 	}
 
 	app.Status = request.Status
+	app.UpdatedAt = time.Now()
 	return converter.ApplicationToResponse(app), nil
 }
