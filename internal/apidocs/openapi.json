@@ -3,7 +3,7 @@
   "info": {
     "title": "PathFinder API",
     "version": "1.0.0",
-    "description": "Kontrak statis backend Go Fiber berdasarkan route, controller, model, dan usecase saat ini. Role admin mengelola mahasiswa; mitra mengelola profil mitra (perusahaan adalah alias); mahasiswa mengelola profil mahasiswa. Semua role login dapat membuat cerita dan rekomendasi. Admin tidak otomatis mewarisi akses role lain. Endpoint alias dipertahankan dengan operationId unik. Endpoint hanya didaftarkan bila controller dan middleware terkait tersedia pada RouteConfig. Tidak mencakup jobs CRUD, verifikasi OTP, atau reset password yang belum memiliki route. Request JSON didokumentasikan; batas format URL/upload tidak ditambahkan karena backend hanya menerima string. Validasi omitempty pada string mengabaikan nilai kosong. Error usecase/controller/middleware memakai WebResponse, data=null, errors string. Error level transport/framework (misalnya body limit/content type) dapat berbeda dari status domain yang tercantum."
+    "description": "Kontrak statis backend Go Fiber berdasarkan route, controller, model, dan usecase saat ini. Role admin mengelola mahasiswa; mitra mengelola profil mitra (perusahaan adalah alias); mahasiswa mengelola profil mahasiswa. Semua role login dapat membuat cerita dan rekomendasi. Admin tidak otomatis mewarisi akses role lain. Endpoint alias dipertahankan dengan operationId unik. Endpoint hanya didaftarkan bila controller dan middleware terkait tersedia pada RouteConfig. Jobs mencakup katalog semua role login dan CRUD milik mitra; admin tidak mewarisi akses mitra. Verifikasi OTP dan reset password belum memiliki route. Request JSON didokumentasikan; batas format URL/upload mengikuti endpoint; source_url pada create/update jobs wajib http/https dengan hostname atau kosong. Validasi omitempty pada string mengabaikan nilai kosong. Error usecase/controller/middleware memakai WebResponse, data=null, errors string. Error level transport/framework (misalnya body limit/content type) dapat berbeda dari status domain yang tercantum."
   },
   "servers": [
     {
@@ -39,6 +39,10 @@
     {
       "name": "Stories",
       "description": "Cerita diri pengguna login semua role."
+    },
+    {
+      "name": "Jobs",
+      "description": "Katalog lowongan untuk semua role login; CRUD milik mitra saja. Lowongan seed tanpa pemilik hanya dapat dibaca."
     }
   ],
   "paths": {
@@ -1449,6 +1453,588 @@
         ],
         "description": "Khusus role login mahasiswa. Role selain mahasiswa menghasilkan 403. Tidak ada cerita: 404 \"cerita belum pernah dikirim\"."
       }
+    },
+    "/api/jobs": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Daftar katalog lowongan",
+        "operationId": "listJobs",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login; bukan endpoint publik. Katalog mencakup lowongan mitra dan seed/tanpa pemilik. Default page=1, size=10; pagination ketat, size maksimal 100. Filter search dan category digabung AND serta berlaku pada count dan data. Urutan created_at DESC, lalu id ASC; halaman di luar hasil mengembalikan 200 dengan data=[].",
+        "responses": {
+          "200": {
+            "description": "Lowongan berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Default hanya bila parameter tidak ada. Nilai hadir harus integer positif yang dapat diurai strconv.Atoi; kosong, non-integer, overflow dan offset yang melampaui int ditolak (400).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "Default hanya bila parameter tidak ada. Nilai hadir harus integer 1–100; kosong, non-integer, overflow, nol, negatif, atau >100 ditolak (400), bukan di-clamp.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Di-trim; substring literal case-insensitive pada title ATAU company. %, _ dan backslash di-escape, bukan wildcard. Kosong berarti tanpa filter.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Di-trim; kosong berarti tanpa filter. Selain kosong wajib salah satu JobCategory secara persis (case-sensitive); nilai lain 400.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Software Engineer Intern",
+                "Backend Developer Intern",
+                "Mobile Developer Intern",
+                "Frontend Developer Intern",
+                "Data Analyst Intern",
+                "UI/UX Designer Intern",
+                "QA Engineer Intern",
+                "Network & IT Support Intern",
+                ""
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Detail katalog lowongan",
+        "operationId": "getJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "admin",
+          "mitra",
+          "mahasiswa"
+        ],
+        "description": "Semua role login; bukan endpoint publik. Katalog mencakup lowongan mitra dan seed/tanpa pemilik.",
+        "responses": {
+          "200": {
+            "description": "Lowongan berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "404": {
+            "description": "lowongan tidak ditemukan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "lowongan tidak ditemukan",
+                  "data": null,
+                  "errors": "lowongan tidak ditemukan"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID lowongan persis; tidak diwajibkan berformat UUID."
+          }
+        ]
+      }
+    },
+    "/api/mitra/jobs": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Daftar lowongan milik mitra",
+        "operationId": "listOwnJobs",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus mitra; hasil dibatasi mitra_id akun login, tidak mencakup lowongan mitra lain atau seed/tanpa pemilik. Default page=1, size=10; pagination ketat, size maksimal 100. Filter search dan category digabung AND serta berlaku pada count dan data. Urutan created_at DESC, lalu id ASC; halaman di luar hasil mengembalikan 200 dengan data=[].",
+        "responses": {
+          "200": {
+            "description": "Lowongan berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Default hanya bila parameter tidak ada. Nilai hadir harus integer positif yang dapat diurai strconv.Atoi; kosong, non-integer, overflow dan offset yang melampaui int ditolak (400).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "Default hanya bila parameter tidak ada. Nilai hadir harus integer 1–100; kosong, non-integer, overflow, nol, negatif, atau >100 ditolak (400), bukan di-clamp.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Di-trim; substring literal case-insensitive pada title ATAU company. %, _ dan backslash di-escape, bukan wildcard. Kosong berarti tanpa filter.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Di-trim; kosong berarti tanpa filter. Selain kosong wajib salah satu JobCategory secara persis (case-sensitive); nilai lain 400.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Software Engineer Intern",
+                "Backend Developer Intern",
+                "Mobile Developer Intern",
+                "Frontend Developer Intern",
+                "Data Analyst Intern",
+                "UI/UX Designer Intern",
+                "QA Engineer Intern",
+                "Network & IT Support Intern",
+                ""
+              ]
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Buat lowongan milik mitra",
+        "operationId": "createJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus mitra. String dan setiap entri skill di-trim sebelum validasi. Batas jumlah skill diperiksa sebelum deduplikasi case-insensitive; urutan dan ejaan entri pertama dipertahankan. Entri skill kosong/whitespace ditolak. company, source, mitra_id, id, created_at, updated_at dikelola server, bukan field request. company diambil dari nama akun mitra saat create/update, source selalu mitra, mitra_id dari JWT dan tidak dapat dipindahkan. Validasi gagal menghasilkan 400; source_url invalid: \"source_url harus URL http/https atau kosong\"; kategori invalid: \"kategori lowongan tidak valid\".",
+        "responses": {
+          "201": {
+            "description": "Lowongan berhasil disimpan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mitra/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Detail lowongan milik mitra",
+        "operationId": "getOwnJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus role mitra; admin/mahasiswa mendapat 403. Hanya lowongan dengan mitra_id milik akun login. Lowongan pengguna lain, seed/tanpa pemilik, atau ID tidak ditemukan menghasilkan 404 \"lowongan tidak ditemukan\" (bukan 403).",
+        "responses": {
+          "200": {
+            "description": "Lowongan berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "404": {
+            "description": "lowongan tidak ditemukan; termasuk ID pengguna lain atau seed/tanpa pemilik pada route mitra.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "lowongan tidak ditemukan",
+                  "data": null,
+                  "errors": "lowongan tidak ditemukan"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID lowongan persis; tidak diwajibkan berformat UUID."
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Ubah sebagian lowongan milik mitra (PUT)",
+        "operationId": "putOwnJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus role mitra; admin/mahasiswa mendapat 403. Hanya lowongan dengan mitra_id milik akun login. Lowongan pengguna lain, seed/tanpa pemilik, atau ID tidak ditemukan menghasilkan 404 \"lowongan tidak ditemukan\" (bukan 403). PUT dan PATCH identik: partial update berbasis pointer, bukan replacement. Semua field opsional; dihilangkan atau null berarti tidak diubah. {} valid, tetapi company/source tetap disinkronkan server dan updated_at diperbarui. optional_skills: [] dan source_url: \"\" menghapus nilai. required_skills: [] dan string wajib kosong ditolak. String dan setiap entri skill di-trim sebelum validasi. Batas jumlah skill diperiksa sebelum deduplikasi case-insensitive; urutan dan ejaan entri pertama dipertahankan. Entri skill kosong/whitespace ditolak. company, source, mitra_id, id, created_at, updated_at dikelola server, bukan field request. company diambil dari nama akun mitra saat create/update, source selalu mitra, mitra_id dari JWT dan tidak dapat dipindahkan.",
+        "responses": {
+          "200": {
+            "description": "Lowongan berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "404": {
+            "description": "lowongan tidak ditemukan; termasuk ID pengguna lain atau seed/tanpa pemilik pada route mitra.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "lowongan tidak ditemukan",
+                  "data": null,
+                  "errors": "lowongan tidak ditemukan"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID lowongan persis; tidak diwajibkan berformat UUID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateJobRequest"
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Ubah sebagian lowongan milik mitra (PATCH)",
+        "operationId": "patchOwnJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus role mitra; admin/mahasiswa mendapat 403. Hanya lowongan dengan mitra_id milik akun login. Lowongan pengguna lain, seed/tanpa pemilik, atau ID tidak ditemukan menghasilkan 404 \"lowongan tidak ditemukan\" (bukan 403). PUT dan PATCH identik: partial update berbasis pointer, bukan replacement. Semua field opsional; dihilangkan atau null berarti tidak diubah. {} valid, tetapi company/source tetap disinkronkan server dan updated_at diperbarui. optional_skills: [] dan source_url: \"\" menghapus nilai. required_skills: [] dan string wajib kosong ditolak. String dan setiap entri skill di-trim sebelum validasi. Batas jumlah skill diperiksa sebelum deduplikasi case-insensitive; urutan dan ejaan entri pertama dipertahankan. Entri skill kosong/whitespace ditolak. company, source, mitra_id, id, created_at, updated_at dikelola server, bukan field request. company diambil dari nama akun mitra saat create/update, source selalu mitra, mitra_id dari JWT dan tidak dapat dipindahkan.",
+        "responses": {
+          "200": {
+            "description": "Lowongan berhasil diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "404": {
+            "description": "lowongan tidak ditemukan; termasuk ID pengguna lain atau seed/tanpa pemilik pada route mitra.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "lowongan tidak ditemukan",
+                  "data": null,
+                  "errors": "lowongan tidak ditemukan"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID lowongan persis; tidak diwajibkan berformat UUID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateJobRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Hapus lowongan milik mitra",
+        "operationId": "deleteOwnJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-roles": [
+          "mitra"
+        ],
+        "description": "Khusus role mitra; admin/mahasiswa mendapat 403. Hanya lowongan dengan mitra_id milik akun login. Lowongan pengguna lain, seed/tanpa pemilik, atau ID tidak ditemukan menghasilkan 404 \"lowongan tidak ditemukan\" (bukan 403). Menghapus row katalog secara permanen. Sukses 200 (bukan 204), data=null. Snapshot rekomendasi yang sudah tersimpan tidak diubah/dihapus; job_id di dalamnya dapat tidak lagi ditemukan di katalog.",
+        "responses": {
+          "200": {
+            "description": "Lowongan berhasil dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteJobWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "404": {
+            "description": "lowongan tidak ditemukan; termasuk ID pengguna lain atau seed/tanpa pemilik pada route mitra.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "lowongan tidak ditemukan",
+                  "data": null,
+                  "errors": "lowongan tidak ditemukan"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID lowongan persis; tidak diwajibkan berformat UUID."
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2305,6 +2891,315 @@
           "data",
           "paging"
         ]
+      },
+      "JobCategory": {
+        "type": "string",
+        "enum": [
+          "Software Engineer Intern",
+          "Backend Developer Intern",
+          "Mobile Developer Intern",
+          "Frontend Developer Intern",
+          "Data Analyst Intern",
+          "UI/UX Designer Intern",
+          "QA Engineer Intern",
+          "Network & IT Support Intern"
+        ],
+        "description": "Delapan kategori resmi entity.Positions; pencocokan persis dan case-sensitive setelah trim."
+      },
+      "CreateJobRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 150
+          },
+          "category": {
+            "$ref": "#/components/schemas/JobCategory"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 10000
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "work_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "String bebas, bukan enum."
+          },
+          "required_skills": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "optional_skills": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "source_url": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Kosong atau URL http/https dengan hostname; divalidasi server setelah trim."
+          }
+        },
+        "required": [
+          "title",
+          "category",
+          "description",
+          "location",
+          "work_type",
+          "required_skills"
+        ],
+        "description": "String dan setiap entri skill di-trim sebelum validasi. Batas jumlah skill diperiksa sebelum deduplikasi case-insensitive; urutan dan ejaan entri pertama dipertahankan. Entri skill kosong/whitespace ditolak. company, source, mitra_id, id, created_at, updated_at dikelola server, bukan field request. company diambil dari nama akun mitra saat create/update, source selalu mitra, mitra_id dari JWT dan tidak dapat dipindahkan. optional_skills boleh dihilangkan/null (menjadi []); source_url boleh dihilangkan/null (menjadi string kosong)."
+      },
+      "UpdateJobRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 150,
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "Software Engineer Intern",
+              "Backend Developer Intern",
+              "Mobile Developer Intern",
+              "Frontend Developer Intern",
+              "Data Analyst Intern",
+              "UI/UX Designer Intern",
+              "QA Engineer Intern",
+              "Network & IT Support Intern",
+              null
+            ],
+            "nullable": true,
+            "description": "Kategori resmi; null berarti tidak diubah."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "nullable": true
+          },
+          "work_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "String bebas, bukan enum.",
+            "nullable": true
+          },
+          "required_skills": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "nullable": true
+          },
+          "optional_skills": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "nullable": true
+          },
+          "source_url": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Kosong atau URL http/https dengan hostname; divalidasi server setelah trim.",
+            "nullable": true
+          }
+        },
+        "description": "PUT dan PATCH identik: partial update berbasis pointer, bukan replacement. Semua field opsional; dihilangkan atau null berarti tidak diubah. {} valid, tetapi company/source tetap disinkronkan server dan updated_at diperbarui. optional_skills: [] dan source_url: \"\" menghapus nilai. required_skills: [] dan string wajib kosong ditolak. String dan setiap entri skill di-trim sebelum validasi. Batas jumlah skill diperiksa sebelum deduplikasi case-insensitive; urutan dan ejaan entri pertama dipertahankan. Entri skill kosong/whitespace ditolak. company, source, mitra_id, id, created_at, updated_at dikelola server, bukan field request. company diambil dari nama akun mitra saat create/update, source selalu mitra, mitra_id dari JWT dan tidak dapat dipindahkan."
+      },
+      "JobResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID lowongan; create menghasilkan UUID, seed dapat memakai ID non-UUID."
+          },
+          "mitra_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pemilik dikelola server; null pada lowongan seed/tanpa pemilik.",
+            "readOnly": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/JobCategory"
+          },
+          "company": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Nama akun pemilik saat create/update; seed memakai data katalog."
+          },
+          "description": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "work_type": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "readOnly": true,
+            "description": "mitra untuk create/update oleh mitra; seed mempertahankan sumber katalog."
+          },
+          "source_url": {
+            "type": "string",
+            "description": "Bisa kosong; create/update memvalidasi http/https, data seed mengikuti katalog."
+          },
+          "required_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "optional_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "id",
+          "mitra_id",
+          "title",
+          "category",
+          "company",
+          "description",
+          "location",
+          "work_type",
+          "source",
+          "source_url",
+          "required_skills",
+          "optional_skills",
+          "created_at",
+          "updated_at"
+        ],
+        "description": "Seluruh field hadir, termasuk mitra_id=null. Daftar skill selalu array, tidak null. Batas create/update tidak diberlakukan ulang pada data seed."
+      },
+      "JobWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/JobResponse"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "data"
+        ],
+        "description": "Envelope model.WebResponse; errors dihilangkan. paging dihilangkan."
+      },
+      "JobListWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobResponse"
+            }
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "data",
+          "paging"
+        ],
+        "description": "Envelope model.WebResponse; errors dihilangkan. paging berada di tingkat teratas; hasil kosong data=[] dan total_page=0."
+      },
+      "DeleteJobWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NullData"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "data"
+        ],
+        "description": "Envelope model.WebResponse; errors dihilangkan. paging dihilangkan."
       }
     },
     "responses": {

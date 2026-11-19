@@ -39,7 +39,7 @@ func Bootstrap(config *BootstrapConfig) {
 	userRepository := repository.NewUserRepository(config.Log)
 	passwordResetRepository := repository.NewPasswordResetRepository(config.Log)
 	storyRepository := repository.NewStoryRepository(config.Log)
-	_ = repository.NewJobRepository(config.Log)
+	jobRepository := repository.NewJobRepository(config.Log)
 
 	// Setup services
 	mailService := service.NewMailService(config.Config, config.Log)
@@ -57,11 +57,14 @@ func Bootstrap(config *BootstrapConfig) {
 	mahasiswaUseCase := usecase.NewMahasiswaUseCase(config.DB, config.Log, config.Validate, userRepository)
 	storyUseCase := usecase.NewStoryUseCase(config.DB, config.Log, config.Validate, storyRepository)
 
+	jobUseCase := usecase.NewJobUseCase(config.DB, config.Log, config.Validate, jobRepository)
+
 	// Setup controllers
 	userController := http.NewUserController(userUseCase, config.Log)
 	adminMahasiswaController := http.NewAdminMahasiswaController(mahasiswaUseCase, config.Log)
 	hajiCodingController := http.NewHajiCodingController(config.Log)
 	storyController := http.NewStoryController(storyUseCase, config.Log)
+	jobController := http.NewJobController(jobUseCase, config.Log)
 
 	// Setup middleware
 	authMiddleware := middleware.NewAuth(config.Config)
@@ -76,6 +79,7 @@ func Bootstrap(config *BootstrapConfig) {
 		AdminMahasiswaController: adminMahasiswaController,
 		HajiCodingController:     hajiCodingController,
 		StoryController:          storyController,
+		JobController:            jobController,
 		AuthMiddleware:           authMiddleware,
 		AdminMiddleware:          adminMiddleware,
 		MitraMiddleware:          mitraMiddleware,
