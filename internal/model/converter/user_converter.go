@@ -16,6 +16,7 @@ func UserToResponse(user *entity.User) *model.UserResponse {
 		Location:       user.Location,
 		CV:             user.CV,
 		PortfolioURL:   user.PortfolioURL,
+		FCMToken:       user.FCMToken,
 		CreatedAt:      user.CreatedAt,
 		UpdatedAt:      user.UpdatedAt,
 	}

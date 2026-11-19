@@ -30,6 +30,10 @@ func NewViper() *viper.Viper {
 	_ = config.BindEnv("mail.password", "MAIL_PASSWORD")
 	_ = config.BindEnv("mail.from", "MAIL_FROM")
 
+	_ = config.BindEnv("firebase.credentials_file", "FIREBASE_CREDENTIALS_FILE")
+	_ = config.BindEnv("firebase.credentials_json", "FIREBASE_CREDENTIALS_JSON")
+	_ = config.BindEnv("firebase.project_id", "FIREBASE_PROJECT_ID")
+
 	config.SetConfigName("config")
 	config.SetConfigType("json")
 	config.AddConfigPath("./../")

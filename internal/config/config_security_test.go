@@ -35,7 +35,7 @@ func TestJWTSecretConfiguration(t *testing.T) {
 }
 
 func TestDatabaseAndMailEnvOverride(t *testing.T) {
-	for _, k := range []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "MAIL_HOST", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_FROM"} {
+	for _, k := range []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "MAIL_HOST", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_FROM", "FIREBASE_CREDENTIALS_FILE", "FIREBASE_CREDENTIALS_JSON", "FIREBASE_PROJECT_ID"} {
 		t.Setenv(k, "")
 	}
 	dir := t.TempDir()

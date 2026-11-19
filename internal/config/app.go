@@ -43,6 +43,7 @@ func Bootstrap(config *BootstrapConfig) {
 
 	// Setup services
 	mailService := service.NewMailService(config.Config, config.Log)
+	fcmService := service.NewFCMService(config.Config, config.Log)
 
 	// Setup use cases
 	userUseCase := usecase.NewUserUseCase(
@@ -53,6 +54,7 @@ func Bootstrap(config *BootstrapConfig) {
 		userRepository,
 		passwordResetRepository,
 		mailService,
+		fcmService,
 	)
 	mahasiswaUseCase := usecase.NewMahasiswaUseCase(config.DB, config.Log, config.Validate, userRepository)
 	storyUseCase := usecase.NewStoryUseCase(config.DB, config.Log, config.Validate, storyRepository)

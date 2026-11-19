@@ -19,6 +19,7 @@ type User struct {
 	Location       string    `gorm:"column:location"`
 	CV             string    `gorm:"column:cv"`
 	PortfolioURL   string    `gorm:"column:portfolio_url"`
+	FCMToken       string    `gorm:"column:fcm_token"`
 	CreatedAt      time.Time `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt      time.Time `gorm:"column:updated_at;autoCreateTime;autoUpdateTime"`
 }

@@ -214,3 +214,34 @@ func (c *UserController) UpdateMahasiswaProfile(ctx fiber.Ctx) error {
 		Data:    response,
 	})
 }
+
+func (c *UserController) UpdateFCMToken(ctx fiber.Ctx) error {
+	userID, ok := ctx.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(model.WebResponse[any]{
+			Success: false,
+			Message: "Unauthorized",
+			Errors:  "unauthorized",
+		})
+	}
+
+	request := new(model.UpdateFCMTokenRequest)
+	if err := ctx.Bind().Body(request); err != nil {
+		c.Log.Warnf("Failed to parse update FCM token request body: %v", err)
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Success: false,
+			Message: "Permintaan tidak valid",
+			Errors:  err.Error(),
+		})
+	}
+
+	if err := c.UseCase.UpdateFCMToken(ctx.Context(), userID, request); err != nil {
+		return err
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[any]{
+		Success: true,
+		Message: "FCM token berhasil diperbarui",
+		Data:    nil,
+	})
+}
