@@ -13,6 +13,7 @@ type RouteConfig struct {
 	AdminMahasiswaController *http.AdminMahasiswaController
 	HajiCodingController     *http.HajiCodingController
 	StoryController          *http.StoryController
+	JobController            *http.JobController
 	RecommendationController *http.RecommendationController
 	AuthMiddleware           fiber.Handler
 	AdminMiddleware          fiber.Handler
@@ -42,6 +43,18 @@ func (c *RouteConfig) SetupGuestRoute() {
 }
 
 func (c *RouteConfig) SetupAuthRoute() {
+	if c.JobController != nil && c.AuthMiddleware != nil {
+		c.App.Get("/api/jobs", c.AuthMiddleware, c.JobController.List)
+		c.App.Get("/api/jobs/:id", c.AuthMiddleware, c.JobController.Get)
+		if c.MitraMiddleware != nil {
+			c.App.Post("/api/mitra/jobs", c.AuthMiddleware, c.MitraMiddleware, c.JobController.Create)
+			c.App.Get("/api/mitra/jobs", c.AuthMiddleware, c.MitraMiddleware, c.JobController.ListOwn)
+			c.App.Get("/api/mitra/jobs/:id", c.AuthMiddleware, c.MitraMiddleware, c.JobController.GetOwn)
+			c.App.Put("/api/mitra/jobs/:id", c.AuthMiddleware, c.MitraMiddleware, c.JobController.Update)
+			c.App.Patch("/api/mitra/jobs/:id", c.AuthMiddleware, c.MitraMiddleware, c.JobController.Update)
+			c.App.Delete("/api/mitra/jobs/:id", c.AuthMiddleware, c.MitraMiddleware, c.JobController.Delete)
+		}
+	}
 	if c.UserController != nil && c.AuthMiddleware != nil {
 		// Endpoint user terautentikasi (semua role)
 		c.App.Get("/api/users/current", c.AuthMiddleware, c.UserController.Current)
