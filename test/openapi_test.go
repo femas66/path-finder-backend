@@ -24,7 +24,6 @@ func TestOpenAPIDocumentation(t *testing.T) {
 		AdminMahasiswaController: &controller.AdminMahasiswaController{},
 		HajiCodingController:     &controller.HajiCodingController{},
 		StoryController:          &controller.StoryController{},
-		RecommendationController: &controller.RecommendationController{},
 		JobController:            &controller.JobController{},
 		AuthMiddleware:           pass, AdminMiddleware: pass, MitraMiddleware: pass, MahasiswaMiddleware: pass,
 	}

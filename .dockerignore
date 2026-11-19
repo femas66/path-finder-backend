@@ -1,0 +1,9 @@
+.git
+.gitignore
+*.md
+.DS_Store
+.idea
+.vscode
+api-test.http
+start-backend.ps1
+test

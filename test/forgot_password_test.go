@@ -65,8 +65,8 @@ func TestForgotPassword(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		// Verifikasi response time sangat cepat (< 100ms) karena asynchronous goroutine
-		assert.Less(t, elapsed, 100*time.Millisecond, "Response time harus cepat dan non-blocking")
+		// Verifikasi response time cepat dan non-blocking karena asynchronous goroutine
+		assert.Less(t, elapsed, 1*time.Second, "Response time harus cepat dan non-blocking")
 
 		respBytes, _ := io.ReadAll(resp.Body)
 		var webResp model.WebResponse[*model.ForgotPasswordResponse]

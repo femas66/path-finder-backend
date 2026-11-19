@@ -4,14 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"time"
-
 	"haji-koding/path-finder/internal/authconfig"
 	"haji-koding/path-finder/internal/entity"
 	"haji-koding/path-finder/internal/model"
 	"haji-koding/path-finder/internal/model/converter"
 	"haji-koding/path-finder/internal/repository"
 	"haji-koding/path-finder/internal/service"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"

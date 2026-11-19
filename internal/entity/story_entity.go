@@ -4,8 +4,7 @@ import "time"
 
 const (
 	StoryAnalysisPending = "pending"
-	// StoryAnalysisDone menandai cerita sudah dianalisis mesin rekomendasi.
-	StoryAnalysisDone = "done"
+	StoryAnalysisDone    = "done"
 )
 
 type Story struct {

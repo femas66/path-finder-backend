@@ -4,15 +4,15 @@ services:
     container_name: path_finder_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: juragansengon88
-      POSTGRES_PASSWORD: juragansengon88
-      POSTGRES_DB: path_finder_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-path_finder_db}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U juragansengon88 -d path_finder_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,6 +27,11 @@ services:
     restart: unless-stopped
     environment:
       JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET before starting backend}"
+      DB_HOST: postgres
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_NAME: ${DB_NAME:-path_finder_db}
     ports:
       - "3000:3000"
     depends_on:

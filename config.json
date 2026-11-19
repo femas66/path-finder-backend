@@ -9,16 +9,9 @@
     "secret": "",
     "expire": 86400
   },
-  "mail": {
-    "host": "",
-    "port": 587,
+  "database": {
     "username": "",
     "password": "",
-    "from": "no-reply@pathfinder.com"
-  },
-  "database": {
-    "username": "juragansengon88",
-    "password": "juragansengon88",
     "host": "localhost",
     "port": 5432,
     "name": "path_finder_db",

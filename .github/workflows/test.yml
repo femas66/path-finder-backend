@@ -23,7 +23,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U juragansengon88 -d path_finder_db"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -45,4 +45,7 @@ jobs:
         env:
           # Test-only key for the isolated CI database; never use in production.
           JWT_SECRET: pathfinder-ci-test-only-signing-secret
+          DB_USER: juragansengon88
+          DB_PASSWORD: juragansengon88
+          DB_NAME: path_finder_db
         run: go test -v -cover ./...

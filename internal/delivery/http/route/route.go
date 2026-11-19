@@ -14,7 +14,6 @@ type RouteConfig struct {
 	HajiCodingController     *http.HajiCodingController
 	StoryController          *http.StoryController
 	JobController            *http.JobController
-	RecommendationController *http.RecommendationController
 	AuthMiddleware           fiber.Handler
 	AdminMiddleware          fiber.Handler
 	MitraMiddleware          fiber.Handler
@@ -88,24 +87,18 @@ func (c *RouteConfig) SetupAuthRoute() {
 			c.App.Patch("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
 		}
 
-		// Endpoint cerita diri (semua role yang sudah login)
-		if c.StoryController != nil {
-			c.App.Post("/api/stories", c.AuthMiddleware, c.StoryController.Create)
-			c.App.Get("/api/stories/me", c.AuthMiddleware, c.StoryController.Current)
-		}
-
-		// Endpoint rekomendasi (semua role yang sudah login)
-		if c.RecommendationController != nil {
-			c.App.Post("/api/recommendations", c.AuthMiddleware, c.RecommendationController.Create)
-			c.App.Get("/api/recommendations/me/latest", c.AuthMiddleware, c.RecommendationController.Latest)
-		}
-
 		// Endpoint khusus role Mahasiswa
 		if c.MahasiswaMiddleware != nil {
 			c.App.Get("/api/mahasiswa/dashboard", c.AuthMiddleware, c.MahasiswaMiddleware, c.UserController.MahasiswaDashboard)
 			c.App.Get("/api/mahasiswa/profile", c.AuthMiddleware, c.MahasiswaMiddleware, c.UserController.Current)
 			c.App.Put("/api/mahasiswa/profile", c.AuthMiddleware, c.MahasiswaMiddleware, c.UserController.UpdateMahasiswaProfile)
 			c.App.Patch("/api/mahasiswa/profile", c.AuthMiddleware, c.MahasiswaMiddleware, c.UserController.UpdateMahasiswaProfile)
+
+			// Endpoint cerita diri (khusus role Mahasiswa)
+			if c.StoryController != nil {
+				c.App.Post("/api/stories", c.AuthMiddleware, c.MahasiswaMiddleware, c.StoryController.Create)
+				c.App.Get("/api/stories/me", c.AuthMiddleware, c.MahasiswaMiddleware, c.StoryController.Current)
+			}
 		}
 	}
 }

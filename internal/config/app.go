@@ -1,8 +1,6 @@
 package config
 
 import (
-	"context"
-
 	"haji-koding/path-finder/internal/delivery/http"
 	"haji-koding/path-finder/internal/delivery/http/middleware"
 	"haji-koding/path-finder/internal/delivery/http/route"
@@ -33,7 +31,6 @@ func Bootstrap(config *BootstrapConfig) {
 		&entity.PasswordReset{},
 		&entity.Story{},
 		&entity.Job{},
-		&entity.Recommendation{},
 	); err != nil {
 		config.Log.Fatalf("Failed to auto migrate database: %v", err)
 	}
@@ -43,7 +40,6 @@ func Bootstrap(config *BootstrapConfig) {
 	passwordResetRepository := repository.NewPasswordResetRepository(config.Log)
 	storyRepository := repository.NewStoryRepository(config.Log)
 	jobRepository := repository.NewJobRepository(config.Log)
-	recommendationRepository := repository.NewRecommendationRepository(config.Log)
 
 	// Setup services
 	mailService := service.NewMailService(config.Config, config.Log)
@@ -61,26 +57,6 @@ func Bootstrap(config *BootstrapConfig) {
 	mahasiswaUseCase := usecase.NewMahasiswaUseCase(config.DB, config.Log, config.Validate, userRepository)
 	storyUseCase := usecase.NewStoryUseCase(config.DB, config.Log, config.Validate, storyRepository)
 
-	// Leksikon keahlian dipakai mesin rekomendasi untuk mengenali skill dari narasi.
-	skillLexicon, err := usecase.DefaultSkillLexicon()
-	if err != nil {
-		config.Log.Fatalf("Failed to load skill lexicon: %v", err)
-	}
-
-	recommendationUseCase := usecase.NewRecommendationUseCase(
-		config.DB,
-		config.Log,
-		recommendationRepository,
-		jobRepository,
-		storyRepository,
-		skillLexicon,
-	)
-
-	// Katalog lowongan di-seed sekali; kegagalan di sini tidak mematikan server.
-	if err := recommendationUseCase.SeedJobs(context.Background()); err != nil {
-		config.Log.Warnf("Failed to seed job catalog: %v", err)
-	}
-
 	jobUseCase := usecase.NewJobUseCase(config.DB, config.Log, config.Validate, jobRepository)
 
 	// Setup controllers
@@ -89,7 +65,6 @@ func Bootstrap(config *BootstrapConfig) {
 	hajiCodingController := http.NewHajiCodingController(config.Log)
 	storyController := http.NewStoryController(storyUseCase, config.Log)
 	jobController := http.NewJobController(jobUseCase, config.Log)
-	recommendationController := http.NewRecommendationController(recommendationUseCase, config.Log)
 
 	// Setup middleware
 	authMiddleware := middleware.NewAuth(config.Config)
@@ -105,7 +80,6 @@ func Bootstrap(config *BootstrapConfig) {
 		HajiCodingController:     hajiCodingController,
 		StoryController:          storyController,
 		JobController:            jobController,
-		RecommendationController: recommendationController,
 		AuthMiddleware:           authMiddleware,
 		AdminMiddleware:          adminMiddleware,
 		MitraMiddleware:          mitraMiddleware,

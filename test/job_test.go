@@ -16,7 +16,6 @@ import (
 	"haji-koding/path-finder/internal/config"
 	"haji-koding/path-finder/internal/entity"
 	"haji-koding/path-finder/internal/model"
-	"haji-koding/path-finder/internal/repository"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -320,10 +319,25 @@ func TestJobsAuthorizationOwnershipAndSeedReadOnly(t *testing.T) {
 			f.request(t, method, "/api/mitra/jobs/"+id, f.ownerToken, jobTestPayload(), 404, nil)
 		}
 	}
+	seed := entity.Job{
+		ID:             uuid.NewString(),
+		MitraID:        nil,
+		Title:          "Seed Catalog Job",
+		Category:       "Backend Developer Intern",
+		Company:        "Catalog Company",
+		Description:    "Seed job without mitra owner.",
+		Location:       "Jakarta",
+		WorkType:       "Hybrid",
+		Source:         "seed",
+		RequiredSkills: []string{"Go"},
+		OptionalSkills: []string{},
+	}
+	require.NoError(t, f.db.Create(&seed).Error)
+	seed = f.stored(t, seed.ID)
+
 	var seeds []entity.Job
 	require.NoError(t, f.db.Where("mitra_id IS NULL").Find(&seeds).Error)
-	require.NotEmpty(t, seeds, "Bootstrap should seed private schema catalog")
-	seed := seeds[0]
+	require.NotEmpty(t, seeds, "Catalog should contain seed jobs")
 	f.request(t, "GET", "/api/jobs/"+seed.ID, f.studentToken, nil, 200, nil)
 	for _, method := range []string{"GET", "PATCH", "PUT", "DELETE"} {
 		f.request(t, method, "/api/mitra/jobs/"+seed.ID, f.ownerToken, jobTestPayload(), 404, nil)
@@ -473,71 +487,4 @@ func TestJobsPaginationAndLiteralFilters(t *testing.T) {
 	}
 	require.Equal(t, tieA.ID, first.Data[0].ID)
 	require.Equal(t, tieB.ID, next.Data[0].ID)
-}
-
-func TestJobsRecommendationCatalogAndSnapshot(t *testing.T) {
-	f := newJobTestFixture(t)
-	repo := repository.NewJobRepository(f.log)
-	findAll := func() []entity.Job {
-		t.Helper()
-		var jobs []entity.Job
-		require.NoError(t, repo.FindAll(f.db, &jobs))
-		for i := 1; i < len(jobs); i++ {
-			require.Less(t, jobs[i-1].ID, jobs[i].ID)
-		}
-		return jobs
-	}
-	baseline := findAll()
-	created := f.create(t, f.ownerToken, jobTestPayload())
-	jobs := findAll()
-	require.Len(t, jobs, len(baseline)+1)
-	var live entity.Job
-	for _, job := range jobs {
-		if job.ID == created.ID {
-			live = job
-		}
-	}
-	require.Equal(t, created.Title, live.Title)
-	require.Equal(t, created.RequiredSkills, live.RequiredSkills)
-	// Saved recommendations embed presentation data; no live jobs FK or join.
-	snapshot := entity.Recommendation{
-		ID: uuid.NewString(), UserID: f.student.ID, StoryID: uuid.NewString(),
-		Status: entity.RecommendationStatusOK, SchemaVersion: "1.0", ModelVersion: "jobs-test",
-		TopK: 1, ProfileStatus: entity.ProfileStatusLengkap, GeneratedAt: time.Now().UTC(),
-		Items: []entity.RecommendationItem{{JobID: created.ID, Title: created.Title, Category: created.Category,
-			Company: created.Company, Location: created.Location, WorkType: created.WorkType, Source: created.Source, SourceURL: created.SourceURL,
-			MatchedSkills: []string{"Go"}, MissingSkills: []string{"PostgreSQL"}, ScoreStatus: entity.ScoreStatusOK}},
-	}
-	require.NoError(t, f.db.Create(&snapshot).Error)
-	var before entity.Recommendation
-	require.NoError(t, f.db.First(&before, "id = ?", snapshot.ID).Error)
-	f.request(t, "PATCH", "/api/mitra/jobs/"+created.ID, f.ownerToken, map[string]any{"title": "Changed Live Catalog Title", "required_skills": []string{"Python"}}, 200, nil)
-	found := false
-	for _, job := range findAll() {
-		if job.ID == created.ID {
-			found = true
-			require.Equal(t, "Changed Live Catalog Title", job.Title)
-			require.Equal(t, []string{"Python"}, job.RequiredSkills)
-		}
-	}
-	require.True(t, found)
-	assertSnapshot := func() {
-		t.Helper()
-		var after entity.Recommendation
-		require.NoError(t, f.db.First(&after, "id = ?", snapshot.ID).Error)
-		require.Equal(t, before, after)
-		var response model.WebResponse[json.RawMessage]
-		f.request(t, "GET", "/api/recommendations/me/latest", f.studentToken, nil, 200, &response)
-		require.Contains(t, string(response.Data), created.Title)
-		require.Contains(t, string(response.Data), created.ID)
-		require.NotContains(t, string(response.Data), "Changed Live Catalog Title")
-	}
-	assertSnapshot()
-	f.request(t, "DELETE", "/api/mitra/jobs/"+created.ID, f.ownerToken, nil, 200, nil)
-	remaining := findAll()
-	require.Len(t, remaining, len(baseline))
-	for _, job := range remaining {
-		require.NotEqual(t, created.ID, job.ID)
-	}
-	assertSnapshot()
 }

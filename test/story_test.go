@@ -144,4 +144,25 @@ func TestStoryCreate(t *testing.T) {
 		assert.Equal(t, "mhs-story", webResp.Data.UserID)
 		assert.Equal(t, expectedContent, webResp.Data.Content)
 	})
+
+	t.Run("Role non-mahasiswa ditolak 403 Forbidden", func(t *testing.T) {
+		adminToken := createAndLogin("admin-story", "Admin", "admin.story@univ.ac.id", "pass123", entity.RoleAdmin)
+		mitraToken := createAndLogin("mitra-story", "Mitra", "mitra.story@univ.ac.id", "pass123", entity.RoleMitra)
+
+		reqBody := model.CreateStoryRequest{Content: validContent}
+		bodyBytes, _ := json.Marshal(reqBody)
+
+		reqAdmin := httptest.NewRequest(http.MethodPost, "/api/stories", bytes.NewReader(bodyBytes))
+		reqAdmin.Header.Set("Content-Type", "application/json")
+		reqAdmin.Header.Set("Authorization", fmt.Sprintf("Bearer %s", adminToken))
+		respAdmin, err := app.Test(reqAdmin)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, respAdmin.StatusCode)
+
+		reqMitra := httptest.NewRequest(http.MethodGet, "/api/stories/me", nil)
+		reqMitra.Header.Set("Authorization", fmt.Sprintf("Bearer %s", mitraToken))
+		respMitra, err := app.Test(reqMitra)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, respMitra.StatusCode)
+	})
 }
