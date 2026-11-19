@@ -21,6 +21,10 @@ func setupTestApp() (*gorm.DB, *http.Server, error) {
 }
 
 func clearUsers(db *gorm.DB) {
+	db.Exec("DELETE FROM applications")
+	db.Exec("DELETE FROM jobs")
+	db.Exec("DELETE FROM stories")
+	db.Exec("DELETE FROM password_resets")
 	db.Exec("DELETE FROM users")
 }
 
@@ -64,10 +68,12 @@ func TestUserRegistrationAndLogin(t *testing.T) {
 
 		assert.True(t, webResp.Success)
 		assert.Equal(t, "Registrasi berhasil", webResp.Message)
-		assert.Equal(t, reqBody.Name, webResp.Data.Name)
-		assert.Equal(t, reqBody.Email, webResp.Data.Email)
-		assert.Equal(t, entity.RoleMahasiswa, webResp.Data.Role)
-		assert.NotEmpty(t, webResp.Data.ID)
+		if assert.NotNil(t, webResp.Data) {
+			assert.Equal(t, reqBody.Name, webResp.Data.Name)
+			assert.Equal(t, reqBody.Email, webResp.Data.Email)
+			assert.Equal(t, entity.RoleMahasiswa, webResp.Data.Role)
+			assert.NotEmpty(t, webResp.Data.ID)
+		}
 	})
 
 	t.Run("Register Duplicate Email", func(t *testing.T) {
@@ -157,9 +163,13 @@ func TestUserRegistrationAndLogin(t *testing.T) {
 
 		assert.True(t, webResp.Success)
 		assert.Equal(t, "Login berhasil", webResp.Message)
-		assert.NotEmpty(t, webResp.Data.Token)
-		assert.Equal(t, "femas@example.com", webResp.Data.User.Email)
-		assert.Equal(t, entity.RoleMahasiswa, webResp.Data.User.Role)
+		if assert.NotNil(t, webResp.Data) {
+			assert.NotEmpty(t, webResp.Data.Token)
+			if assert.NotNil(t, webResp.Data.User) {
+				assert.Equal(t, "femas@example.com", webResp.Data.User.Email)
+				assert.Equal(t, entity.RoleMahasiswa, webResp.Data.User.Role)
+			}
+		}
 	})
 
 	t.Run("Login Wrong Password", func(t *testing.T) {
