@@ -185,6 +185,15 @@ func (f *jobTestFixture) stored(t *testing.T, id string) entity.Job {
 	return job
 }
 
+func requirePersistedJobEqual(t *testing.T, expected, actual model.JobResponse) {
+	t.Helper()
+	// PostgreSQL timestamps retain microseconds, while create responses can contain nanoseconds.
+	require.WithinDuration(t, expected.CreatedAt, actual.CreatedAt, time.Microsecond)
+	require.WithinDuration(t, expected.UpdatedAt, actual.UpdatedAt, time.Microsecond)
+	expected.CreatedAt, expected.UpdatedAt = actual.CreatedAt, actual.UpdatedAt
+	require.Equal(t, expected, actual)
+}
+
 func TestJobsCRUDPersistenceAndSpoofing(t *testing.T) {
 	f := newJobTestFixture(t)
 	payload := jobTestPayload()
@@ -209,11 +218,11 @@ func TestJobsCRUDPersistenceAndSpoofing(t *testing.T) {
 	for _, path := range []string{"/api/jobs/", "/api/mitra/jobs/"} {
 		var response model.WebResponse[model.JobResponse]
 		f.request(t, "GET", path+created.ID, f.ownerToken, nil, 200, &response)
-		require.Equal(t, created, response.Data)
+		requirePersistedJobEqual(t, created, response.Data)
 	}
 	own := f.list(t, "/api/mitra/jobs", f.ownerToken)
 	require.EqualValues(t, 1, own.Paging.TotalItem)
-	require.Equal(t, created, own.Data[0])
+	requirePersistedJobEqual(t, created, own.Data[0])
 	var updated model.WebResponse[model.JobResponse]
 	f.request(t, "PATCH", "/api/mitra/jobs/"+created.ID, f.ownerToken, map[string]any{
 		"title": "  Updated Backend Engineer  ", "required_skills": []string{" SQL ", "sql", "Go"},
@@ -226,7 +235,7 @@ func TestJobsCRUDPersistenceAndSpoofing(t *testing.T) {
 	require.Equal(t, f.owner.Name, updated.Data.Company)
 	require.Equal(t, "mitra", updated.Data.Source)
 	require.Equal(t, created.Description, updated.Data.Description)
-	require.Equal(t, created.CreatedAt, updated.Data.CreatedAt)
+	require.WithinDuration(t, created.CreatedAt, updated.Data.CreatedAt, time.Microsecond)
 	require.False(t, updated.Data.UpdatedAt.Before(created.UpdatedAt))
 	stored = f.stored(t, created.ID)
 	require.Equal(t, []string{"SQL", "Go"}, stored.RequiredSkills)
@@ -240,7 +249,7 @@ func TestJobsCRUDPersistenceAndSpoofing(t *testing.T) {
 	require.Equal(t, stored.OptionalSkills, skills)
 	var readback model.WebResponse[model.JobResponse]
 	f.request(t, "GET", "/api/jobs/"+created.ID, f.studentToken, nil, 200, &readback)
-	require.Equal(t, updated.Data, readback.Data)
+	requirePersistedJobEqual(t, updated.Data, readback.Data)
 	f.request(t, "PUT", "/api/mitra/jobs/"+created.ID, f.ownerToken, map[string]any{
 		"location": " Bandung ", "optional_skills": []string{}, "source_url": "", "title": nil, "required_skills": nil,
 		"mitra_id": f.other.ID, "company": "Spoofed", "source": "csv",
