@@ -14,6 +14,7 @@ type RouteConfig struct {
 	HajiCodingController     *http.HajiCodingController
 	StoryController          *http.StoryController
 	JobController            *http.JobController
+	ApplicationController    *http.ApplicationController
 	AuthMiddleware           fiber.Handler
 	AdminMiddleware          fiber.Handler
 	MitraMiddleware          fiber.Handler
@@ -86,6 +87,12 @@ func (c *RouteConfig) SetupAuthRoute() {
 			c.App.Get("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.Current)
 			c.App.Put("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
 			c.App.Patch("/api/perusahaan/profile", c.AuthMiddleware, c.MitraMiddleware, c.UserController.UpdateMitraProfile)
+
+			if c.ApplicationController != nil {
+				c.App.Get("/api/mitra/applications", c.AuthMiddleware, c.MitraMiddleware, c.ApplicationController.ListMitra)
+				c.App.Patch("/api/mitra/applications/:id/status", c.AuthMiddleware, c.MitraMiddleware, c.ApplicationController.UpdateStatus)
+				c.App.Put("/api/mitra/applications/:id/status", c.AuthMiddleware, c.MitraMiddleware, c.ApplicationController.UpdateStatus)
+			}
 		}
 
 		// Endpoint khusus role Mahasiswa
@@ -94,6 +101,12 @@ func (c *RouteConfig) SetupAuthRoute() {
 			c.App.Get("/api/mahasiswa/profile", c.AuthMiddleware, c.MahasiswaMiddleware, c.UserController.Current)
 			c.App.Put("/api/mahasiswa/profile", c.AuthMiddleware, c.MahasiswaMiddleware, c.UserController.UpdateMahasiswaProfile)
 			c.App.Patch("/api/mahasiswa/profile", c.AuthMiddleware, c.MahasiswaMiddleware, c.UserController.UpdateMahasiswaProfile)
+
+			if c.ApplicationController != nil {
+				c.App.Post("/api/jobs/:id/apply", c.AuthMiddleware, c.MahasiswaMiddleware, c.ApplicationController.Apply)
+				c.App.Post("/api/mahasiswa/applications", c.AuthMiddleware, c.MahasiswaMiddleware, c.ApplicationController.Apply)
+				c.App.Get("/api/mahasiswa/applications", c.AuthMiddleware, c.MahasiswaMiddleware, c.ApplicationController.ListMahasiswa)
+			}
 
 			// Endpoint cerita diri (khusus role Mahasiswa)
 			if c.StoryController != nil {

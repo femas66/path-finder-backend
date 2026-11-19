@@ -31,6 +31,7 @@ func Bootstrap(config *BootstrapConfig) {
 		&entity.PasswordReset{},
 		&entity.Story{},
 		&entity.Job{},
+		&entity.Application{},
 	); err != nil {
 		config.Log.Fatalf("Failed to auto migrate database: %v", err)
 	}
@@ -40,6 +41,7 @@ func Bootstrap(config *BootstrapConfig) {
 	passwordResetRepository := repository.NewPasswordResetRepository(config.Log)
 	storyRepository := repository.NewStoryRepository(config.Log)
 	jobRepository := repository.NewJobRepository(config.Log)
+	applicationRepository := repository.NewApplicationRepository(config.Log)
 
 	// Setup services
 	mailService := service.NewMailService(config.Config, config.Log)
@@ -60,6 +62,7 @@ func Bootstrap(config *BootstrapConfig) {
 	storyUseCase := usecase.NewStoryUseCase(config.DB, config.Log, config.Validate, storyRepository)
 
 	jobUseCase := usecase.NewJobUseCase(config.DB, config.Log, config.Validate, jobRepository)
+	applicationUseCase := usecase.NewApplicationUseCase(config.DB, config.Log, config.Validate, applicationRepository, jobRepository, userRepository)
 
 	// Setup controllers
 	userController := http.NewUserController(userUseCase, config.Log)
@@ -67,6 +70,7 @@ func Bootstrap(config *BootstrapConfig) {
 	hajiCodingController := http.NewHajiCodingController(config.Log)
 	storyController := http.NewStoryController(storyUseCase, config.Log)
 	jobController := http.NewJobController(jobUseCase, config.Log)
+	applicationController := http.NewApplicationController(applicationUseCase, config.Log)
 
 	// Setup middleware
 	authMiddleware := middleware.NewAuth(config.Config)
@@ -82,6 +86,7 @@ func Bootstrap(config *BootstrapConfig) {
 		HajiCodingController:     hajiCodingController,
 		StoryController:          storyController,
 		JobController:            jobController,
+		ApplicationController:    applicationController,
 		AuthMiddleware:           authMiddleware,
 		AdminMiddleware:          adminMiddleware,
 		MitraMiddleware:          mitraMiddleware,
