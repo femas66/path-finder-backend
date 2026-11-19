@@ -319,10 +319,25 @@ func TestJobsAuthorizationOwnershipAndSeedReadOnly(t *testing.T) {
 			f.request(t, method, "/api/mitra/jobs/"+id, f.ownerToken, jobTestPayload(), 404, nil)
 		}
 	}
+	seed := entity.Job{
+		ID:             uuid.NewString(),
+		MitraID:        nil,
+		Title:          "Seed Catalog Job",
+		Category:       "Backend Developer Intern",
+		Company:        "Catalog Company",
+		Description:    "Seed job without mitra owner.",
+		Location:       "Jakarta",
+		WorkType:       "Hybrid",
+		Source:         "seed",
+		RequiredSkills: []string{"Go"},
+		OptionalSkills: []string{},
+	}
+	require.NoError(t, f.db.Create(&seed).Error)
+	seed = f.stored(t, seed.ID)
+
 	var seeds []entity.Job
 	require.NoError(t, f.db.Where("mitra_id IS NULL").Find(&seeds).Error)
-	require.NotEmpty(t, seeds, "Bootstrap should seed private schema catalog")
-	seed := seeds[0]
+	require.NotEmpty(t, seeds, "Catalog should contain seed jobs")
 	f.request(t, "GET", "/api/jobs/"+seed.ID, f.studentToken, nil, 200, nil)
 	for _, method := range []string{"GET", "PATCH", "PUT", "DELETE"} {
 		f.request(t, method, "/api/mitra/jobs/"+seed.ID, f.ownerToken, jobTestPayload(), 404, nil)
