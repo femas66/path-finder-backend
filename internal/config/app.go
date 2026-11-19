@@ -81,11 +81,14 @@ func Bootstrap(config *BootstrapConfig) {
 		config.Log.Warnf("Failed to seed job catalog: %v", err)
 	}
 
+	jobUseCase := usecase.NewJobUseCase(config.DB, config.Log, config.Validate, jobRepository)
+
 	// Setup controllers
 	userController := http.NewUserController(userUseCase, config.Log)
 	adminMahasiswaController := http.NewAdminMahasiswaController(mahasiswaUseCase, config.Log)
 	hajiCodingController := http.NewHajiCodingController(config.Log)
 	storyController := http.NewStoryController(storyUseCase, config.Log)
+	jobController := http.NewJobController(jobUseCase, config.Log)
 	recommendationController := http.NewRecommendationController(recommendationUseCase, config.Log)
 
 	// Setup middleware
@@ -101,6 +104,7 @@ func Bootstrap(config *BootstrapConfig) {
 		AdminMahasiswaController: adminMahasiswaController,
 		HajiCodingController:     hajiCodingController,
 		StoryController:          storyController,
+		JobController:            jobController,
 		RecommendationController: recommendationController,
 		AuthMiddleware:           authMiddleware,
 		AdminMiddleware:          adminMiddleware,

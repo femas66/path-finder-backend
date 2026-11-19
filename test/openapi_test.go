@@ -25,6 +25,7 @@ func TestOpenAPIDocumentation(t *testing.T) {
 		HajiCodingController:     &controller.HajiCodingController{},
 		StoryController:          &controller.StoryController{},
 		RecommendationController: &controller.RecommendationController{},
+		JobController:            &controller.JobController{},
 		AuthMiddleware:           pass, AdminMiddleware: pass, MitraMiddleware: pass, MahasiswaMiddleware: pass,
 	}
 	routes.Setup()
