@@ -23,9 +23,13 @@ func TestApplicationUseCase(t *testing.T) {
 
 	require.NoError(t, db.AutoMigrate(&entity.User{}, &entity.Job{}, &entity.Application{}))
 
-	db.Exec("DELETE FROM applications")
-	db.Exec("DELETE FROM jobs")
-	db.Exec("DELETE FROM users")
+	cleanDB := func() {
+		db.Exec("DELETE FROM applications")
+		db.Exec("DELETE FROM jobs")
+		db.Exec("DELETE FROM users")
+	}
+	cleanDB()
+	t.Cleanup(cleanDB)
 
 	userRepo := repository.NewUserRepository(log)
 	jobRepo := repository.NewJobRepository(log)

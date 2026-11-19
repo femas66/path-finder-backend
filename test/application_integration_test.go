@@ -34,9 +34,13 @@ func TestApplicationIntegration(t *testing.T) {
 		Config:   viperConfig,
 	})
 
-	db.Exec("DELETE FROM applications")
-	db.Exec("DELETE FROM jobs")
-	db.Exec("DELETE FROM users")
+	cleanDB := func() {
+		db.Exec("DELETE FROM applications")
+		db.Exec("DELETE FROM jobs")
+		db.Exec("DELETE FROM users")
+	}
+	cleanDB()
+	t.Cleanup(cleanDB)
 
 	createAndLogin := func(id, name, email, password, role string, profilePic, cv, portfolio string) string {
 		hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
