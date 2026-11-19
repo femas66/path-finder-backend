@@ -35,6 +35,9 @@ func TestJWTSecretConfiguration(t *testing.T) {
 }
 
 func TestDatabaseAndMailEnvOverride(t *testing.T) {
+	for _, k := range []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "MAIL_HOST", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_FROM"} {
+		t.Setenv(k, "")
+	}
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{
 		"jwt": {"secret": "mysecret"},
