@@ -120,4 +120,117 @@ func TestForgotPassword(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
+
+	t.Run("Verify Reset Code - Success", func(t *testing.T) {
+		// Buat record OTP di database
+		resetRecord := &entity.PasswordReset{
+			ID:        uuid.New().String(),
+			Email:     "femas@example.com",
+			Code:      "654321",
+			Attempts:  0,
+			ExpiredAt: time.Now().Add(15 * time.Minute),
+		}
+		db.Create(resetRecord)
+
+		reqBody := model.VerifyResetCodeRequest{
+			Email: "femas@example.com",
+			Code:  "654321",
+		}
+		bodyBytes, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest(http.MethodPost, "/api/users/verify-reset-code", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		respBytes, _ := io.ReadAll(resp.Body)
+		var webResp model.WebResponse[*model.VerifyResetCodeResponse]
+		err = json.Unmarshal(respBytes, &webResp)
+		assert.NoError(t, err)
+		assert.True(t, webResp.Success)
+		assert.Equal(t, "Kode verifikasi valid", webResp.Message)
+		assert.True(t, webResp.Data.Valid)
+	})
+
+	t.Run("Verify Reset Code - Wrong Code", func(t *testing.T) {
+		reqBody := model.VerifyResetCodeRequest{
+			Email: "femas@example.com",
+			Code:  "000000",
+		}
+		bodyBytes, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest(http.MethodPost, "/api/users/verify-reset-code", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		respBytes, _ := io.ReadAll(resp.Body)
+		var webResp model.WebResponse[any]
+		_ = json.Unmarshal(respBytes, &webResp)
+		assert.False(t, webResp.Success)
+		assert.Equal(t, "kode verifikasi salah", webResp.Message)
+	})
+
+	t.Run("Reset Password - Success and Login with New Password", func(t *testing.T) {
+		// Record reset masih ada dari test sebelumnya (code: 654321)
+		reqBody := model.ResetPasswordRequest{
+			Email:           "femas@example.com",
+			Code:            "654321",
+			Password:        "newpassword123",
+			ConfirmPassword: "newpassword123",
+		}
+		bodyBytes, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest(http.MethodPost, "/api/users/reset-password", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		respBytes, _ := io.ReadAll(resp.Body)
+		var webResp model.WebResponse[any]
+		_ = json.Unmarshal(respBytes, &webResp)
+		assert.True(t, webResp.Success)
+		assert.Contains(t, webResp.Message, "Password berhasil diubah")
+
+		// Verifikasi record reset terhapus
+		var checkReset entity.PasswordReset
+		err = db.Where("email = ?", "femas@example.com").Take(&checkReset).Error
+		assert.Error(t, err)
+
+		// Verifikasi login dengan password baru
+		loginReq := model.LoginUserRequest{
+			Email:    "femas@example.com",
+			Password: "newpassword123",
+		}
+		loginBytes, _ := json.Marshal(loginReq)
+		loginHttpReq := httptest.NewRequest(http.MethodPost, "/api/users/login", bytes.NewReader(loginBytes))
+		loginHttpReq.Header.Set("Content-Type", "application/json")
+
+		loginResp, err := app.Test(loginHttpReq)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, loginResp.StatusCode)
+	})
+
+	t.Run("Reset Password - Mismatched Password", func(t *testing.T) {
+		reqBody := model.ResetPasswordRequest{
+			Email:           "femas@example.com",
+			Code:            "654321",
+			Password:        "newpassword123",
+			ConfirmPassword: "differentpassword",
+		}
+		bodyBytes, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest(http.MethodPost, "/api/users/reset-password", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
 }

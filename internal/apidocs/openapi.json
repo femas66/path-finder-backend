@@ -190,13 +190,94 @@
             "$ref": "#/components/responses/500"
           }
         },
-        "description": "Membuat OTP 6 digit, berlaku 15 menit; menghapus kode lama, mengirim email asinkron. HTTP 200 bukan bukti email berhasil diterima. Email tidak dikenal: 404 \"email tidak ditemukan\". Kode tidak dikembalikan. Belum ada route verifikasi kode atau reset password.",
+        "description": "Membuat OTP 6 digit, berlaku 15 menit; menghapus kode lama, mengirim email asinkron. Dilindungi rate limiter untuk mencegah brute-force tebak email. HTTP 200 bukan bukti email berhasil diterima. Email tidak dikenal: 404 \"email tidak ditemukan\". Kode tidak dikembalikan.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/verify-reset-code": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Verifikasi kode lupa password",
+        "operationId": "verifyResetCodeUsers",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Kode verifikasi valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResetCodeWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Memverifikasi apakah kode OTP 6 digit valid, belum kedaluwarsa, dan belum melebihi batas percobaan gagal.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyResetCodeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/reset-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Reset password dengan kode verifikasi",
+        "operationId": "resetPasswordUsers",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Password berhasil diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetPasswordWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Mereset password user dengan kode OTP yang valid. Setelah berhasil, seluruh kode OTP untuk email tersebut dihapus.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
               }
             }
           }
@@ -316,13 +397,94 @@
             "$ref": "#/components/responses/500"
           }
         },
-        "description": "Membuat OTP 6 digit, berlaku 15 menit; menghapus kode lama, mengirim email asinkron. HTTP 200 bukan bukti email berhasil diterima. Email tidak dikenal: 404 \"email tidak ditemukan\". Kode tidak dikembalikan. Belum ada route verifikasi kode atau reset password. Alias /api/users dengan handler dan kontrak identik.",
+        "description": "Membuat OTP 6 digit, berlaku 15 menit; menghapus kode lama, mengirim email asinkron. Dilindungi rate limiter untuk mencegah brute-force tebak email. HTTP 200 bukan bukti email berhasil diterima. Email tidak dikenal: 404 \"email tidak ditemukan\". Kode tidak dikembalikan. Alias /api/users dengan handler dan kontrak identik.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/verify-reset-code": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Verifikasi kode lupa password (alias)",
+        "operationId": "verifyResetCodeAuth",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Kode verifikasi valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResetCodeWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Alias /api/users/verify-reset-code dengan handler dan kontrak identik.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyResetCodeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Reset password dengan kode verifikasi (alias)",
+        "operationId": "resetPasswordAuth",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Password berhasil diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetPasswordWebResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "description": "Alias /api/users/reset-password dengan handler dan kontrak identik.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
               }
             }
           }
@@ -2771,6 +2933,76 @@
           "email"
         ]
       },
+      "VerifyResetCodeRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "code": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 6
+          }
+        },
+        "required": [
+          "email",
+          "code"
+        ]
+      },
+      "VerifyResetCodeResponse": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "email",
+          "valid"
+        ]
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100
+          },
+          "code": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 6
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 100,
+            "format": "password",
+            "writeOnly": true
+          },
+          "confirm_password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 100,
+            "format": "password",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "code",
+          "password",
+          "confirm_password"
+        ]
+      },
       "UserResponse": {
         "type": "object",
         "properties": {
@@ -3299,6 +3531,52 @@
           "success",
           "message",
           "data"
+        ]
+      },
+      "VerifyResetCodeWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/VerifyResetCodeResponse"
+          }
+        },
+        "description": "Envelope sukses model.WebResponse untuk verifikasi kode OTP.",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ]
+      },
+      "ResetPasswordWebResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "description": "Envelope sukses model.WebResponse untuk reset password.",
+        "required": [
+          "success",
+          "message"
         ]
       },
       "DashboardWebResponse": {

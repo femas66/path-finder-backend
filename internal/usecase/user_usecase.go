@@ -181,6 +181,16 @@ func (u *UserUseCase) ForgotPassword(ctx context.Context, request *model.ForgotP
 		return nil, fiber.NewError(fiber.StatusNotFound, "email tidak ditemukan")
 	}
 
+	// Cek apakah ada permintaan OTP yang baru saja dibuat untuk email ini (cooldown 60 detik)
+	existingReset := new(entity.PasswordReset)
+	if err := u.PasswordResetRepository.FindLatestByEmail(u.DB.WithContext(ctx), existingReset, request.Email); err == nil {
+		if time.Since(existingReset.CreatedAt) < 60*time.Second {
+			remainingSeconds := int(60 - time.Since(existingReset.CreatedAt).Seconds())
+			u.Log.Warnf("Forgot password cooldown active for %s (%d seconds remaining)", request.Email, remainingSeconds)
+			return nil, fiber.NewError(fiber.StatusTooManyRequests, fmt.Sprintf("Harap tunggu %d detik sebelum meminta kode baru lagi", remainingSeconds))
+		}
+	}
+
 	// Hapus kode reset lama untuk email ini jika ada
 	_ = u.PasswordResetRepository.DeleteByEmail(u.DB.WithContext(ctx), request.Email)
 
@@ -195,6 +205,7 @@ func (u *UserUseCase) ForgotPassword(ctx context.Context, request *model.ForgotP
 		ID:        uuid.New().String(),
 		Email:     request.Email,
 		Code:      code,
+		Attempts:  0,
 		ExpiredAt: time.Now().Add(15 * time.Minute),
 	}
 
@@ -221,6 +232,84 @@ func (u *UserUseCase) ForgotPassword(ctx context.Context, request *model.ForgotP
 	u.MailService.SendEmailAsync(request.Email, emailSubject, emailBody)
 
 	return converter.UserToForgotPasswordResponse(request.Email), nil
+}
+
+func (u *UserUseCase) VerifyResetCode(ctx context.Context, request *model.VerifyResetCodeRequest) (*model.VerifyResetCodeResponse, error) {
+	if err := u.Validate.Struct(request); err != nil {
+		u.Log.Warnf("Invalid verify reset code request: %v", err)
+		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	reset := new(entity.PasswordReset)
+	err := u.PasswordResetRepository.FindLatestByEmail(u.DB.WithContext(ctx), reset, request.Email)
+	if err != nil {
+		u.Log.Warnf("Reset code not found for email %s: %v", request.Email, err)
+		return nil, fiber.NewError(fiber.StatusBadRequest, "kode verifikasi tidak ditemukan atau tidak valid")
+	}
+
+	if time.Now().After(reset.ExpiredAt) {
+		_ = u.PasswordResetRepository.DeleteByEmail(u.DB.WithContext(ctx), request.Email)
+		return nil, fiber.NewError(fiber.StatusBadRequest, "kode verifikasi telah kedaluwarsa")
+	}
+
+	if reset.Code != request.Code {
+		reset.Attempts++
+		if reset.Attempts >= 5 {
+			_ = u.PasswordResetRepository.DeleteByEmail(u.DB.WithContext(ctx), request.Email)
+			u.Log.Warnf("Too many failed attempts for email %s, reset code invalidated", request.Email)
+			return nil, fiber.NewError(fiber.StatusBadRequest, "terlalu banyak percobaan kode yang salah, kode telah dibatalkan")
+		}
+		_ = u.PasswordResetRepository.Update(u.DB.WithContext(ctx), reset)
+		return nil, fiber.NewError(fiber.StatusBadRequest, "kode verifikasi salah")
+	}
+
+	return &model.VerifyResetCodeResponse{
+		Email: request.Email,
+		Valid: true,
+	}, nil
+}
+
+func (u *UserUseCase) ResetPassword(ctx context.Context, request *model.ResetPasswordRequest) error {
+	if err := u.Validate.Struct(request); err != nil {
+		u.Log.Warnf("Invalid reset password request: %v", err)
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	reset := new(entity.PasswordReset)
+	err := u.PasswordResetRepository.FindByEmailAndCode(u.DB.WithContext(ctx), reset, request.Email, request.Code)
+	if err != nil {
+		u.Log.Warnf("Invalid reset code during password reset for email %s: %v", request.Email, err)
+		return fiber.NewError(fiber.StatusBadRequest, "kode verifikasi tidak valid atau salah")
+	}
+
+	if time.Now().After(reset.ExpiredAt) {
+		_ = u.PasswordResetRepository.DeleteByEmail(u.DB.WithContext(ctx), request.Email)
+		return fiber.NewError(fiber.StatusBadRequest, "kode verifikasi telah kedaluwarsa")
+	}
+
+	user := new(entity.User)
+	err = u.UserRepository.FindByEmail(u.DB.WithContext(ctx), user, request.Email)
+	if err != nil {
+		u.Log.Warnf("User not found for email %s: %v", request.Email, err)
+		return fiber.NewError(fiber.StatusNotFound, "user tidak ditemukan")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		u.Log.Errorf("Failed to hash password: %v", err)
+		return fiber.NewError(fiber.StatusInternalServerError, "gagal memproses password baru")
+	}
+
+	user.Password = string(hashedPassword)
+	if err := u.UserRepository.Update(u.DB.WithContext(ctx), user); err != nil {
+		u.Log.Errorf("Failed to update user password: %v", err)
+		return fiber.NewError(fiber.StatusInternalServerError, "gagal memperbarui password")
+	}
+
+	// Hapus semua record password_resets untuk email ini
+	_ = u.PasswordResetRepository.DeleteByEmail(u.DB.WithContext(ctx), request.Email)
+
+	return nil
 }
 
 func (u *UserUseCase) Current(ctx context.Context, userID string) (*model.UserResponse, error) {
