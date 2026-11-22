@@ -114,6 +114,23 @@ type ForgotPasswordResponse struct {
 	Email string `json:"email"`
 }
 
+type VerifyResetCodeRequest struct {
+	Email string `json:"email" validate:"required,email,max=100"`
+	Code  string `json:"code" validate:"required,len=6"`
+}
+
+type VerifyResetCodeResponse struct {
+	Email string `json:"email"`
+	Valid bool   `json:"valid"`
+}
+
+type ResetPasswordRequest struct {
+	Email           string `json:"email" validate:"required,email,max=100"`
+	Code            string `json:"code" validate:"required,len=6"`
+	Password        string `json:"password" validate:"required,min=6,max=100"`
+	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
+}
+
 type VerifyUserRequest struct {
 	Token string `validate:"required,max=100"`
 }

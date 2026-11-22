@@ -89,6 +89,51 @@ func (c *UserController) ForgotPassword(ctx fiber.Ctx) error {
 	})
 }
 
+func (c *UserController) VerifyResetCode(ctx fiber.Ctx) error {
+	request := new(model.VerifyResetCodeRequest)
+	if err := ctx.Bind().Body(request); err != nil {
+		c.Log.Warnf("Failed to parse verify reset code request body: %v", err)
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Success: false,
+			Message: "Permintaan tidak valid",
+			Errors:  err.Error(),
+		})
+	}
+
+	response, err := c.UseCase.VerifyResetCode(ctx.Context(), request)
+	if err != nil {
+		return err
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[*model.VerifyResetCodeResponse]{
+		Success: true,
+		Message: "Kode verifikasi valid",
+		Data:    response,
+	})
+}
+
+func (c *UserController) ResetPassword(ctx fiber.Ctx) error {
+	request := new(model.ResetPasswordRequest)
+	if err := ctx.Bind().Body(request); err != nil {
+		c.Log.Warnf("Failed to parse reset password request body: %v", err)
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Success: false,
+			Message: "Permintaan tidak valid",
+			Errors:  err.Error(),
+		})
+	}
+
+	if err := c.UseCase.ResetPassword(ctx.Context(), request); err != nil {
+		return err
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[any]{
+		Success: true,
+		Message: "Password berhasil diubah, silakan login dengan password baru",
+		Data:    nil,
+	})
+}
+
 func (c *UserController) Current(ctx fiber.Ctx) error {
 	userID, ok := ctx.Locals("user_id").(string)
 	if !ok || userID == "" {

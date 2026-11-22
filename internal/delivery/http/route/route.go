@@ -1,8 +1,11 @@
 package route
 
 import (
+	"time"
+
 	"haji-koding/path-finder/internal/apidocs"
 	"haji-koding/path-finder/internal/delivery/http"
+	"haji-koding/path-finder/internal/delivery/http/middleware"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -33,12 +36,19 @@ func (c *RouteConfig) SetupGuestRoute() {
 	}
 
 	if c.UserController != nil {
+		limiterMiddleware := middleware.NewRateLimiter(10, 1*time.Minute)
+
 		c.App.Post("/api/users/register", c.UserController.Register)
 		c.App.Post("/api/users/login", c.UserController.Login)
-		c.App.Post("/api/users/forgot-password", c.UserController.ForgotPassword)
+		c.App.Post("/api/users/forgot-password", limiterMiddleware, c.UserController.ForgotPassword)
+		c.App.Post("/api/users/verify-reset-code", limiterMiddleware, c.UserController.VerifyResetCode)
+		c.App.Post("/api/users/reset-password", limiterMiddleware, c.UserController.ResetPassword)
+
 		c.App.Post("/api/auth/register", c.UserController.Register)
 		c.App.Post("/api/auth/login", c.UserController.Login)
-		c.App.Post("/api/auth/forgot-password", c.UserController.ForgotPassword)
+		c.App.Post("/api/auth/forgot-password", limiterMiddleware, c.UserController.ForgotPassword)
+		c.App.Post("/api/auth/verify-reset-code", limiterMiddleware, c.UserController.VerifyResetCode)
+		c.App.Post("/api/auth/reset-password", limiterMiddleware, c.UserController.ResetPassword)
 	}
 }
 

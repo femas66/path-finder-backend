@@ -25,3 +25,7 @@ func (r *PasswordResetRepository) DeleteByEmail(db *gorm.DB, email string) error
 func (r *PasswordResetRepository) FindByEmailAndCode(db *gorm.DB, reset *entity.PasswordReset, email, code string) error {
 	return db.Where("email = ? AND code = ?", email, code).Take(reset).Error
 }
+
+func (r *PasswordResetRepository) FindLatestByEmail(db *gorm.DB, reset *entity.PasswordReset, email string) error {
+	return db.Where("email = ?", email).Order("created_at desc").Take(reset).Error
+}
