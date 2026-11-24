@@ -111,6 +111,9 @@ func (u *MahasiswaUseCase) Search(ctx context.Context, request *model.SearchMaha
 	if request.Size > 100 {
 		request.Size = 100
 	}
+	if request.Page > 100000 || request.Page-1 > int(^uint(0)>>1)/request.Size {
+		return nil, nil, fiber.NewError(fiber.StatusBadRequest, "page terlalu besar")
+	}
 
 	var users []entity.User
 	total, err := u.UserRepository.FindAllMahasiswa(u.DB.WithContext(ctx), &users, request.Page, request.Size, request.Search)

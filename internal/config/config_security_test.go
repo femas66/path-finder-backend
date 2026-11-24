@@ -65,3 +65,53 @@ func TestDatabaseAndMailEnvOverride(t *testing.T) {
 	require.Equal(t, "smtpsecret", cfgEnv.GetString("mail.password"))
 }
 
+func TestValidatorURLSecurity(t *testing.T) {
+	validate := NewValidator()
+
+	type URLTest struct {
+		URL string `validate:"omitempty,http_url"`
+	}
+
+	testCases := []struct {
+		url   string
+		valid bool
+	}{
+		{"https://example.com/photo.png", true},
+		{"http://example.com/cv.pdf", true},
+		{"https://subdomain.domain.org/portfolio", true},
+		{"http://localhost/admin", false},
+		{"http://127.0.0.1:8080/secret", false},
+		{"http://0.0.0.0/test", false},
+		{"http://169.254.169.254/latest/meta-data/", false},
+		{"javascript:alert(1)", false},
+		{"data:text/html,test", false},
+		{"ftp://ftp.example.com", false},
+		{"", true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.url, func(t *testing.T) {
+			err := validate.Struct(&URLTest{URL: tc.url})
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestDatabaseSSLModeConfig(t *testing.T) {
+	t.Setenv("DB_SSLMODE", "require")
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{
+		"jwt": {"secret": "mysecret"},
+		"database": {"host": "localhost", "port": 5432, "username": "localuser", "password": "localpassword", "name": "localdb", "sslmode": "disable"}
+	}`), 0600))
+	t.Chdir(dir)
+
+	cfg := NewViper()
+	require.Equal(t, "require", cfg.GetString("database.sslmode"))
+}
+
+

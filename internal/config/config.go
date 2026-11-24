@@ -23,6 +23,7 @@ func NewViper() *viper.Viper {
 	_ = config.BindEnv("database.username", "DB_USER")
 	_ = config.BindEnv("database.password", "DB_PASSWORD")
 	_ = config.BindEnv("database.name", "DB_NAME")
+	_ = config.BindEnv("database.sslmode", "DB_SSLMODE")
 
 	_ = config.BindEnv("mail.host", "MAIL_HOST")
 	_ = config.BindEnv("mail.port", "MAIL_PORT")

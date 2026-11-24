@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"html"
 	"net/url"
 	"strings"
 
@@ -83,10 +85,23 @@ func (u *JobUseCase) mitra(ctx context.Context, id string) (*entity.User, error)
 	return user, nil
 }
 
+func formatValidationError(err error) string {
+	var valErrs validator.ValidationErrors
+	if errors.As(err, &valErrs) {
+		var msgs []string
+		for _, fe := range valErrs {
+			field := strings.ToLower(fe.Field())
+			msgs = append(msgs, fmt.Sprintf("bidang '%s' tidak memenuhi aturan '%s'", field, fe.Tag()))
+		}
+		return strings.Join(msgs, "; ")
+	}
+	return err.Error()
+}
+
 func (u *JobUseCase) Create(ctx context.Context, mitraID string, request *model.CreateJobRequest) (*model.JobResponse, error) {
 	request.Title = strings.TrimSpace(request.Title)
 	request.Category = strings.TrimSpace(request.Category)
-	request.Description = strings.TrimSpace(request.Description)
+	request.Description = html.EscapeString(strings.TrimSpace(request.Description))
 	request.Location = strings.TrimSpace(request.Location)
 	request.WorkType = strings.TrimSpace(request.WorkType)
 	request.SourceURL = strings.TrimSpace(request.SourceURL)
@@ -98,7 +113,7 @@ func (u *JobUseCase) Create(ctx context.Context, mitraID string, request *model.
 		request.OptionalSkills[i] = strings.TrimSpace(request.OptionalSkills[i])
 	}
 	if err := u.Validate.Struct(request); err != nil {
-		return nil, fiber.NewError(400, err.Error())
+		return nil, fiber.NewError(400, formatValidationError(err))
 	}
 	if !entity.IsValidPosition(request.Category) {
 		return nil, fiber.NewError(400, "kategori lowongan tidak valid")
@@ -171,6 +186,10 @@ func (u *JobUseCase) Update(ctx context.Context, id, mitraID string, request *mo
 			*field = strings.TrimSpace(*field)
 		}
 	}
+	if request.Description != nil {
+		escaped := html.EscapeString(*request.Description)
+		request.Description = &escaped
+	}
 	for _, skills := range []*[]string{request.RequiredSkills, request.OptionalSkills} {
 		if skills != nil {
 			for i := range *skills {
@@ -179,7 +198,7 @@ func (u *JobUseCase) Update(ctx context.Context, id, mitraID string, request *mo
 		}
 	}
 	if err := u.Validate.Struct(request); err != nil {
-		return nil, fiber.NewError(400, err.Error())
+		return nil, fiber.NewError(400, formatValidationError(err))
 	}
 	if request.Category != nil && !entity.IsValidPosition(*request.Category) {
 		return nil, fiber.NewError(400, "kategori lowongan tidak valid")

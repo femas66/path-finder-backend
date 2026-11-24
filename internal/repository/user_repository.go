@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strings"
+
 	"haji-koding/path-finder/internal/entity"
 
 	"github.com/sirupsen/logrus"
@@ -54,7 +56,8 @@ func (r *UserRepository) FindAllMahasiswa(db *gorm.DB, users *[]entity.User, pag
 	query := db.Model(&entity.User{}).Where("role = ?", entity.RoleMahasiswa)
 
 	if search != "" {
-		s := "%" + search + "%"
+		escaped := strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(search)
+		s := "%" + escaped + "%"
 		query = query.Where("name ILIKE ? OR nim ILIKE ? OR email ILIKE ?", s, s, s)
 	}
 
@@ -63,6 +66,12 @@ func (r *UserRepository) FindAllMahasiswa(db *gorm.DB, users *[]entity.User, pag
 		return 0, err
 	}
 
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 {
+		size = 10
+	}
 	offset := (page - 1) * size
 	err := query.Order("created_at DESC").Offset(offset).Limit(size).Find(users).Error
 	return total, err

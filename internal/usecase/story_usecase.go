@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"html"
 	"strings"
 
 	"haji-koding/path-finder/internal/entity"
@@ -43,7 +44,7 @@ func NewStoryUseCase(
 // Konten dirapikan lebih dulu (trim) sebelum divalidasi agar spasi di awal/akhir
 // tidak membuat panjang minimum 50 karakter lolos secara palsu.
 func (u *StoryUseCase) Create(ctx context.Context, userID string, request *model.CreateStoryRequest) (*model.StoryResponse, error) {
-	request.Content = strings.TrimSpace(request.Content)
+	request.Content = html.EscapeString(strings.TrimSpace(request.Content))
 
 	if err := u.Validate.Struct(request); err != nil {
 		u.Log.Warnf("Invalid create story request: %v", err)
@@ -81,7 +82,7 @@ func (u *StoryUseCase) Current(ctx context.Context, userID string) (*model.Story
 }
 
 func (u *StoryUseCase) Update(ctx context.Context, userID string, storyID string, request *model.UpdateStoryRequest) (*model.StoryResponse, error) {
-	request.Content = strings.TrimSpace(request.Content)
+	request.Content = html.EscapeString(strings.TrimSpace(request.Content))
 
 	if err := u.Validate.Struct(request); err != nil {
 		u.Log.Warnf("Invalid update story request: %v", err)
