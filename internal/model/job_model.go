@@ -3,6 +3,7 @@ package model
 import "time"
 
 type CreateJobRequest struct {
+	Status         string   `json:"status" validate:"omitempty,oneof=aktif ditutup"`
 	Title          string   `json:"title" validate:"required,min=3,max=150"`
 	Category       string   `json:"category" validate:"required"`
 	Description    string   `json:"description" validate:"required,min=20,max=10000"`
@@ -16,6 +17,7 @@ type CreateJobRequest struct {
 // PUT and PATCH both update only non-null fields. Omitted and null fields are unchanged.
 // Empty optional_skills and source_url clear their values; required fields cannot be empty.
 type UpdateJobRequest struct {
+	Status         *string   `json:"status" validate:"omitempty,oneof=aktif ditutup"`
 	Title          *string   `json:"title" validate:"omitempty,min=3,max=150"`
 	Category       *string   `json:"category" validate:"omitempty,min=1"`
 	Description    *string   `json:"description" validate:"omitempty,min=20,max=10000"`
@@ -27,6 +29,7 @@ type UpdateJobRequest struct {
 }
 
 type ListJobRequest struct {
+	Status   string `json:"status" validate:"omitempty,oneof=aktif ditutup"`
 	Page     int    `json:"page" validate:"min=1"`
 	Size     int    `json:"size" validate:"min=1,max=100"`
 	Search   string `json:"search"`
@@ -34,6 +37,7 @@ type ListJobRequest struct {
 }
 
 type JobResponse struct {
+	Status         string    `json:"status"`
 	ID             string    `json:"id"`
 	MitraID        *string   `json:"mitra_id"`
 	Title          string    `json:"title"`

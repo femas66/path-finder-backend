@@ -27,11 +27,23 @@ func (r *JobRepository) FindAll(db *gorm.DB, jobs *[]entity.Job) error {
 	return db.Order("id ASC").Find(jobs).Error
 }
 
+// FindActive excludes closed jobs from newly generated recommendations.
+func (r *JobRepository) FindActive(db *gorm.DB, jobs *[]entity.Job) error {
+	return db.Where("status = ?", entity.JobStatusAktif).Order("id ASC").Find(jobs).Error
+}
+
 // List applies the same tenant and catalog filters to count and page queries.
 func (r *JobRepository) List(db *gorm.DB, jobs *[]entity.Job, request *model.ListJobRequest, mitraID *string) (int64, error) {
 	query := db.Model(&entity.Job{})
 	if mitraID != nil {
 		query = query.Where("mitra_id = ?", *mitraID)
+	}
+	status := request.Status
+	if status == "" && mitraID == nil {
+		status = entity.JobStatusAktif
+	}
+	if status != "" {
+		query = query.Where("status = ?", status)
 	}
 	if request.Category != "" {
 		query = query.Where("category = ?", request.Category)

@@ -51,7 +51,7 @@ func (c *JobController) list(ctx fiber.Ctx, own bool) error {
 	if err != nil {
 		return err
 	}
-	request := &model.ListJobRequest{Page: 1, Size: 10, Search: ctx.Query("search"), Category: ctx.Query("category")}
+	request := &model.ListJobRequest{Page: 1, Size: 10, Search: ctx.Query("search"), Category: ctx.Query("category"), Status: ctx.Query("status")}
 	for key, target := range map[string]*int{"page": &request.Page, "size": &request.Size} {
 		if ctx.Request().URI().QueryArgs().Has(key) {
 			value, err := strconv.Atoi(ctx.Query(key))

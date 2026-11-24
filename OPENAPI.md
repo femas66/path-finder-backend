@@ -65,9 +65,12 @@ Kontrak lengkap, schema request/response, parameter, dan contoh error tersedia d
 
 - `GET /api/jobs` dan `GET /api/jobs/{id}`: katalog untuk semua role login
   (`admin`, `mitra`, `mahasiswa`), bukan endpoint publik. Termasuk lowongan seed
-  dan lowongan mitra lain.
+  dan lowongan mitra lain. Daftar default hanya `status: aktif`; gunakan
+  `GET /api/jobs?status=ditutup` untuk lowongan ditutup. Detail berdasarkan ID
+  tetap dapat dibaca saat ditutup.
 - `GET /api/mitra/jobs` dan `POST /api/mitra/jobs`: daftar milik sendiri dan buat
-  lowongan; khusus role `mitra`.
+  lowongan; khusus role `mitra`. Daftar milik sendiri tanpa filter status
+  mencakup `aktif` dan `ditutup`.
 - `GET`, `PUT`, `PATCH`, `DELETE /api/mitra/jobs/{id}`: khusus `mitra`, hanya
   lowongan dengan `mitra_id` akun login. ID tidak ada, milik mitra lain, atau
   seed/tanpa pemilik menghasilkan `404` dengan `lowongan tidak ditemukan`.
@@ -79,8 +82,12 @@ Nilai kosong, non-integer, nol, negatif, overflow, `size > 100`, atau offset
 melampaui rentang integer menghasilkan `400`, bukan dikoreksi otomatis.
 `search` di-trim dan mencari substring literal case-insensitive pada `title`
 atau `company`; `%`, `_`, dan backslash bukan wildcard. `category` di-trim dan
-harus cocok persis dengan enum berikut; kosong berarti tanpa filter. Kedua
-filter digabung AND. Urutan `created_at DESC, id ASC`; `paging` di tingkat
+harus cocok persis dengan enum berikut; kosong berarti tanpa filter.
+`status` opsional, di-trim, dan case-sensitive: hanya `aktif` atau `ditutup`;
+nilai lain menghasilkan `400`. Dihilangkan, string kosong, atau whitespace
+memakai default endpoint: `aktif` untuk katalog, tanpa filter status untuk
+daftar milik sendiri. Filter `search`, `category`, dan `status` digabung AND
+pada count dan data. Urutan `created_at DESC, id ASC`; `paging` di tingkat
 teratas berisi `page`, `size`, `total_item`, `total_page`. Hasil kosong tetap
 `data: []`; tanpa hasil `total_page: 0`.
 
@@ -117,12 +124,16 @@ karakter. String dan entri skill di-trim sebelum validasi; skill dideduplikasi
 case-insensitive sesudah batas input diperiksa, mempertahankan urutan dan ejaan
 pertama. Entri kosong/whitespace ditolak. `source_url` maksimal 1000 karakter,
 berupa URL `http`/`https` dengan hostname atau string kosong.
+`status` opsional dengan enum `aktif`/`ditutup` (case-sensitive), di-trim sebelum
+validasi. Dihilangkan, `null` (bind ke zero value string), `""`, atau whitespace
+menjadi `aktif`; nilai lain menghasilkan `400`.
 
 `company`, `source`, `mitra_id`, ID, dan timestamp dikelola server, bukan field
 request. `company` memakai nama akun mitra saat create/update, `source` selalu
 `mitra`, dan pemilik berasal dari identitas JWT; ownership tidak dapat dipindah.
-Respons selalu menyertakan `mitra_id` (nullable) dan kedua daftar skill sebagai
-array. Create menghasilkan `201`; GET/update/delete menghasilkan `200`.
+Respons selalu menyertakan `status` (wajib, non-null, `aktif`/`ditutup`),
+`mitra_id` (nullable), dan kedua daftar skill sebagai array. Create menghasilkan
+`201`; GET/update/delete menghasilkan `200`.
 Delete mengembalikan `data: null`, bukan `204`.
 
 **PUT dan PATCH sama-sama partial update berbasis pointer, bukan replacement.**
@@ -138,18 +149,34 @@ opsional tanpa mengubah field lain, kirim body berikut ke salah satu metode:
 }
 ```
 
-### Catatan migrasi dan snapshot
+### Tutup dan buka kembali
+
+`status` pada PUT/PATCH opsional dan berbasis pointer: dihilangkan atau `null`
+berarti tidak diubah. Nilai di-trim; `""` eksplisit atau whitespace ditolak
+(`400`), bukan menjadi `aktif`. Hanya `aktif`/`ditutup` yang valid.
+
+Gunakan route yang sama, `PATCH /api/mitra/jobs/{id}`, tanpa endpoint baru:
+
+- Tutup: `{"status":"ditutup"}`.
+- Buka kembali: `{"status":"aktif"}`.
+
+Hanya pemilik dapat mengubah status. Mitra lain tetap mendapat `404`; aturan
+role dan seed/tanpa pemilik tetap berlaku. PUT mendukung perubahan yang sama.
+
+### Catatan migrasi
 
 - Startup menjalankan GORM `AutoMigrate` untuk `jobs` dan `applications`.
-- Kolom pemilik `mitra_id` pada `jobs` nullable dan berindeks.
+- Kolom pemilik `mitra_id` pada `jobs` nullable dan berindeks. Pastikan migrasi
+  kolom/index diterapkan pada database deployment; data seed lama tidak perlu
+  diberi pemilik.
+- Kolom `status` memiliki default database `aktif`, `NOT NULL`, dan index.
+  Migrasi dari tabel tanpa kolom status mengisi row lama, termasuk seed, dengan
+  `aktif`. Migrasi ulang mempertahankan `ditutup`, tidak membuka ulang lowongan.
 - Relasi `applications` memiliki foreign key ke `jobs` dan `users` (`mahasiswa_id`) dengan cascade delete (`constraint:OnUpdate:CASCADE,OnDelete:CASCADE`).
 - Lowongan seed/tanpa pemilik tetap `mitra_id: null`: terbaca di katalog, tidak
   muncul pada daftar milik mitra, dan read-only melalui API mitra. Batas input
   create/update tidak diberlakukan ulang pada data seed.
-- Delete menghapus row katalog secara permanen. Snapshot rekomendasi yang sudah
-  tersimpan tidak diubah atau dihapus; `job_id` di snapshot dapat menunjuk row
-  yang sudah tidak ada, sehingga GET katalog untuk ID tersebut mengembalikan
-  `404`. Perubahan lowongan juga tidak menulis ulang snapshot lama.
+- Delete menghapus row katalog secara permanen.
 
 ## Pendaftaran Magang (Applications)
 
@@ -247,6 +274,7 @@ Kontrak lengkap tersedia di [Swagger UI](http://localhost:3000/docs) (tag **Stor
 ## Batas cakupan
 
 Kontrak mencakup endpoint aktif, termasuk delapan operasi jobs dan alias
-auth/perusahaan. Dashboard saat ini hanya identitas login; lupa password hanya
-mengirim OTP. Verifikasi OTP serta reset password belum didokumentasikan karena
-belum ada route. Rekomendasi masih rule-based di Go, bukan integrasi layanan ML.
+auth/perusahaan. Dashboard saat ini hanya identitas login. Alur lupa password
+mencakup pengiriman kode OTP, verifikasi kode, dan reset password beserta alias
+`/api/auth/*`. Cerita khusus role `mahasiswa`. Endpoint rekomendasi belum
+tersedia; dokumentasi tidak menjanjikan analisis atau snapshot rekomendasi.

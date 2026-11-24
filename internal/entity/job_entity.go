@@ -22,9 +22,15 @@ func IsValidPosition(category string) bool {
 	return false
 }
 
+const (
+	JobStatusAktif   = "aktif"
+	JobStatusDitutup = "ditutup"
+)
+
 type Job struct {
 	ID             string    `gorm:"column:id;primaryKey"`
 	MitraID        *string   `gorm:"column:mitra_id;index"`
+	Status         string    `gorm:"column:status;not null;default:aktif;index"`
 	Title          string    `gorm:"column:title;not null"`
 	Category       string    `gorm:"column:category;not null;index"`
 	Company        string    `gorm:"column:company"`

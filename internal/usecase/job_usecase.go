@@ -55,7 +55,7 @@ func validJobURL(value string) bool {
 
 func jobResponse(job *entity.Job) *model.JobResponse {
 	return &model.JobResponse{
-		ID: job.ID, MitraID: job.MitraID, Title: job.Title, Category: job.Category,
+		ID: job.ID, MitraID: job.MitraID, Status: job.Status, Title: job.Title, Category: job.Category,
 		Company: job.Company, Description: job.Description, Location: job.Location,
 		WorkType: job.WorkType, Source: job.Source, SourceURL: job.SourceURL,
 		RequiredSkills: append([]string{}, job.RequiredSkills...), OptionalSkills: append([]string{}, job.OptionalSkills...),
@@ -99,6 +99,10 @@ func formatValidationError(err error) string {
 }
 
 func (u *JobUseCase) Create(ctx context.Context, mitraID string, request *model.CreateJobRequest) (*model.JobResponse, error) {
+	request.Status = strings.TrimSpace(request.Status)
+	if request.Status == "" {
+		request.Status = entity.JobStatusAktif
+	}
 	request.Title = strings.TrimSpace(request.Title)
 	request.Category = strings.TrimSpace(request.Category)
 	request.Description = html.EscapeString(strings.TrimSpace(request.Description))
@@ -126,7 +130,7 @@ func (u *JobUseCase) Create(ctx context.Context, mitraID string, request *model.
 		return nil, err
 	}
 	job := &entity.Job{
-		ID: uuid.NewString(), MitraID: &mitraID, Title: request.Title, Category: request.Category,
+		ID: uuid.NewString(), MitraID: &mitraID, Status: request.Status, Title: request.Title, Category: request.Category,
 		Company: user.Name, Description: request.Description, Location: request.Location,
 		WorkType: request.WorkType, Source: "mitra", SourceURL: request.SourceURL,
 		RequiredSkills: normalizeJobSkills(request.RequiredSkills), OptionalSkills: normalizeJobSkills(request.OptionalSkills),
@@ -138,6 +142,7 @@ func (u *JobUseCase) Create(ctx context.Context, mitraID string, request *model.
 }
 
 func (u *JobUseCase) List(ctx context.Context, request *model.ListJobRequest, mitraID *string) ([]model.JobResponse, *model.PageMetadata, error) {
+	request.Status = strings.TrimSpace(request.Status)
 	request.Search = strings.TrimSpace(request.Search)
 	request.Category = strings.TrimSpace(request.Category)
 	if err := u.Validate.Struct(request); err != nil {
@@ -181,7 +186,7 @@ func (u *JobUseCase) Get(ctx context.Context, id string, mitraID *string) (*mode
 }
 
 func (u *JobUseCase) Update(ctx context.Context, id, mitraID string, request *model.UpdateJobRequest) (*model.JobResponse, error) {
-	for _, field := range []*string{request.Title, request.Category, request.Description, request.Location, request.WorkType, request.SourceURL} {
+	for _, field := range []*string{request.Status, request.Title, request.Category, request.Description, request.Location, request.WorkType, request.SourceURL} {
 		if field != nil {
 			*field = strings.TrimSpace(*field)
 		}
@@ -216,7 +221,7 @@ func (u *JobUseCase) Update(ctx context.Context, id, mitraID string, request *mo
 	}
 	updates := map[string]any{"company": user.Name, "source": "mitra"}
 	for key, field := range map[string]*string{
-		"title": request.Title, "category": request.Category, "description": request.Description,
+		"status": request.Status, "title": request.Title, "category": request.Category, "description": request.Description,
 		"location": request.Location, "work_type": request.WorkType, "source_url": request.SourceURL,
 	} {
 		if field != nil {
