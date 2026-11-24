@@ -56,6 +56,12 @@ func (r *ApplicationRepository) ListByMitraID(db *gorm.DB, apps *[]entity.Applic
 	if size < 1 {
 		size = 10
 	}
+	if size > 100 {
+		size = 100
+	}
+	if page > 100000 || page-1 > int(^uint(0)>>1)/size {
+		return nil, errors.New("page terlalu besar")
+	}
 	offset := (page - 1) * size
 
 	err := query.Select("applications.*").

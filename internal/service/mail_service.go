@@ -2,7 +2,9 @@ package service
 
 import (
 	"fmt"
+	"net"
 	"net/smtp"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -27,6 +29,12 @@ func NewMailService(viperConfig *viper.Viper, logger *logrus.Logger) MailService
 func (s *mailServiceImpl) SendEmailAsync(to string, subject string, body string) {
 	// Jalankan secara asynchronous menggunakan goroutine agar respons API instan (< 10ms)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.Log.Errorf("Recovered from panic in SendEmailAsync for %s: %v", to, r)
+			}
+		}()
+
 		host := s.Viper.GetString("mail.host")
 		port := s.Viper.GetInt("mail.port")
 		username := s.Viper.GetString("mail.username")
@@ -37,7 +45,7 @@ func (s *mailServiceImpl) SendEmailAsync(to string, subject string, body string)
 		}
 
 		if host == "" {
-			s.Log.Infof("[MAIL SIMULATOR] To: %s | Subject: %s | Body: %s", to, subject, body)
+			s.Log.Infof("[MAIL SIMULATOR] To: %s | Subject: %s | Body: [PROTECTED_VERIFICATION_CONTENT]", to, subject)
 			return
 		}
 
@@ -45,14 +53,60 @@ func (s *mailServiceImpl) SendEmailAsync(to string, subject string, body string)
 			from, to, subject, body)
 
 		addr := fmt.Sprintf("%s:%d", host, port)
-		auth := smtp.PlainAuth("", username, password, host)
 
-		err := smtp.SendMail(addr, auth, from, []string{to}, []byte(msg))
+		// Gunakan koneksi dengan deadline timeout untuk mencegah goroutine leak jika remote server hang
+		dialer := &net.Dialer{Timeout: 15 * time.Second}
+		conn, err := dialer.Dial("tcp", addr)
 		if err != nil {
-			s.Log.Errorf("Gagal mengirim email ke %s: %v", to, err)
+			s.Log.Errorf("Gagal menghubungkan ke SMTP server %s: %v", addr, err)
 			return
 		}
 
+		client, err := smtp.NewClient(conn, host)
+		if err != nil {
+			_ = conn.Close()
+			s.Log.Errorf("Gagal inisialisasi SMTP client ke %s: %v", addr, err)
+			return
+		}
+		defer client.Close()
+
+		if username != "" && password != "" {
+			auth := smtp.PlainAuth("", username, password, host)
+			if ok, _ := client.Extension("AUTH"); ok {
+				if err := client.Auth(auth); err != nil {
+					s.Log.Errorf("Gagal autentikasi SMTP: %v", err)
+					return
+				}
+			}
+		}
+
+		if err := client.Mail(from); err != nil {
+			s.Log.Errorf("Gagal menetapkan pengirim SMTP: %v", err)
+			return
+		}
+		if err := client.Rcpt(to); err != nil {
+			s.Log.Errorf("Gagal menetapkan penerima SMTP: %v", err)
+			return
+		}
+
+		w, err := client.Data()
+		if err != nil {
+			s.Log.Errorf("Gagal membuka stream data SMTP: %v", err)
+			return
+		}
+
+		if _, err := w.Write([]byte(msg)); err != nil {
+			_ = w.Close()
+			s.Log.Errorf("Gagal menulis data email: %v", err)
+			return
+		}
+
+		if err := w.Close(); err != nil {
+			s.Log.Errorf("Gagal menyelesaikan penulisan email: %v", err)
+			return
+		}
+
+		_ = client.Quit()
 		s.Log.Infof("Email verifikasi berhasil terkirim ke %s", to)
 	}()
 }

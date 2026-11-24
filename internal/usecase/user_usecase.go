@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"haji-koding/path-finder/internal/authconfig"
 	"haji-koding/path-finder/internal/entity"
@@ -10,12 +11,14 @@ import (
 	"haji-koding/path-finder/internal/model/converter"
 	"haji-koding/path-finder/internal/repository"
 	"haji-koding/path-finder/internal/service"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/bcrypt"
@@ -78,6 +81,12 @@ func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserR
 		}
 	}
 
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		u.Log.Warnf("Failed to hash password: %v", err)
+		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal mengenkripsi password")
+	}
+
 	tx := u.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -92,12 +101,6 @@ func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserR
 		return nil, fiber.NewError(fiber.StatusConflict, "email sudah terdaftar")
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
-	if err != nil {
-		u.Log.Warnf("Failed to hash password: %v", err)
-		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal mengenkripsi password")
-	}
-
 	user := &entity.User{
 		ID:       uuid.New().String(),
 		Name:     request.Name,
@@ -107,11 +110,19 @@ func (u *UserUseCase) Register(ctx context.Context, request *model.RegisterUserR
 	}
 
 	if err := u.UserRepository.Create(tx, user); err != nil {
+		var pgErr *pgconn.PgError
+		if (errors.As(err, &pgErr) && pgErr.Code == "23505") || strings.Contains(err.Error(), "23505") {
+			return nil, fiber.NewError(fiber.StatusConflict, "email sudah terdaftar")
+		}
 		u.Log.Warnf("Failed to create user: %v", err)
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal menyimpan data user")
 	}
 
 	if err := tx.Commit().Error; err != nil {
+		var pgErr *pgconn.PgError
+		if (errors.As(err, &pgErr) && pgErr.Code == "23505") || strings.Contains(err.Error(), "23505") {
+			return nil, fiber.NewError(fiber.StatusConflict, "email sudah terdaftar")
+		}
 		u.Log.Warnf("Failed to commit transaction: %v", err)
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "gagal memproses transaksi")
 	}
@@ -276,7 +287,7 @@ func (u *UserUseCase) ResetPassword(ctx context.Context, request *model.ResetPas
 	}
 
 	reset := new(entity.PasswordReset)
-	err := u.PasswordResetRepository.FindByEmailAndCode(u.DB.WithContext(ctx), reset, request.Email, request.Code)
+	err := u.PasswordResetRepository.FindLatestByEmail(u.DB.WithContext(ctx), reset, request.Email)
 	if err != nil {
 		u.Log.Warnf("Invalid reset code during password reset for email %s: %v", request.Email, err)
 		return fiber.NewError(fiber.StatusBadRequest, "kode verifikasi tidak valid atau salah")
@@ -285,6 +296,17 @@ func (u *UserUseCase) ResetPassword(ctx context.Context, request *model.ResetPas
 	if time.Now().After(reset.ExpiredAt) {
 		_ = u.PasswordResetRepository.DeleteByEmail(u.DB.WithContext(ctx), request.Email)
 		return fiber.NewError(fiber.StatusBadRequest, "kode verifikasi telah kedaluwarsa")
+	}
+
+	if reset.Code != request.Code {
+		reset.Attempts++
+		if reset.Attempts >= 5 {
+			_ = u.PasswordResetRepository.DeleteByEmail(u.DB.WithContext(ctx), request.Email)
+			u.Log.Warnf("Too many failed attempts during reset password for %s, reset code invalidated", request.Email)
+			return fiber.NewError(fiber.StatusBadRequest, "terlalu banyak percobaan kode yang salah, kode telah dibatalkan")
+		}
+		_ = u.PasswordResetRepository.Update(u.DB.WithContext(ctx), reset)
+		return fiber.NewError(fiber.StatusBadRequest, "kode verifikasi salah")
 	}
 
 	user := new(entity.User)
@@ -328,6 +350,20 @@ func (u *UserUseCase) UpdateMitraProfile(ctx context.Context, userID string, req
 		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
+	// Validasi konflik alias jika kedua versi parameter dikirim bersamaan dengan nilai berbeda
+	if request.Name != "" && request.NamaMitra != "" && request.Name != request.NamaMitra {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "parameter 'name' dan 'nama_mitra' dikirim bersamaan dengan nilai berbeda")
+	}
+	if request.Name != "" && request.NamaPerusahaan != "" && request.Name != request.NamaPerusahaan {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "parameter 'name' dan 'nama_perusahaan' dikirim bersamaan dengan nilai berbeda")
+	}
+	if request.Location != "" && request.Lokasi != "" && request.Location != request.Lokasi {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "parameter 'location' dan 'lokasi' dikirim bersamaan dengan nilai berbeda")
+	}
+	if request.ProfilePicture != "" && request.FotoProfile != "" && request.ProfilePicture != request.FotoProfile {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "parameter 'profile_picture' dan 'foto_profile' dikirim bersamaan dengan nilai berbeda")
+	}
+
 	user := new(entity.User)
 	if err := u.UserRepository.FindById(u.DB.WithContext(ctx), user, userID); err != nil {
 		u.Log.Warnf("User not found with id %s: %v", userID, err)
@@ -365,6 +401,17 @@ func (u *UserUseCase) UpdateMahasiswaProfile(ctx context.Context, userID string,
 	if err := u.Validate.Struct(request); err != nil {
 		u.Log.Warnf("Invalid update mahasiswa profile request: %v", err)
 		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	// Validasi konflik alias jika kedua versi parameter dikirim bersamaan dengan nilai berbeda
+	if request.Location != "" && request.Lokasi != "" && request.Location != request.Lokasi {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "parameter 'location' dan 'lokasi' dikirim bersamaan dengan nilai berbeda")
+	}
+	if request.ProfilePicture != "" && request.FotoProfile != "" && request.ProfilePicture != request.FotoProfile {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "parameter 'profile_picture' dan 'foto_profile' dikirim bersamaan dengan nilai berbeda")
+	}
+	if request.PortfolioURL != "" && request.LinkPortofolio != "" && request.PortfolioURL != request.LinkPortofolio {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "parameter 'portfolio_url' dan 'link_portofolio' dikirim bersamaan dengan nilai berbeda")
 	}
 
 	user := new(entity.User)

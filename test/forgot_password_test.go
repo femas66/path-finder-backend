@@ -233,4 +233,40 @@ func TestForgotPassword(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
+
+	t.Run("Reset Password - Wrong Code Increments Attempts and Locks Out", func(t *testing.T) {
+		resetRecord := &entity.PasswordReset{
+			ID:        uuid.New().String(),
+			Email:     "femas@example.com",
+			Code:      "999888",
+			Attempts:  4,
+			ExpiredAt: time.Now().Add(15 * time.Minute),
+		}
+		db.Create(resetRecord)
+
+		reqBody := model.ResetPasswordRequest{
+			Email:           "femas@example.com",
+			Code:            "111222",
+			Password:        "newpassword123",
+			ConfirmPassword: "newpassword123",
+		}
+		bodyBytes, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest(http.MethodPost, "/api/users/reset-password", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		respBytes, _ := io.ReadAll(resp.Body)
+		var webResp model.WebResponse[any]
+		_ = json.Unmarshal(respBytes, &webResp)
+		assert.Contains(t, webResp.Message, "terlalu banyak percobaan")
+
+		// Verifikasi kode terhapus setelah 5 kali gagal
+		var check entity.PasswordReset
+		err = db.Where("email = ?", "femas@example.com").Take(&check).Error
+		assert.Error(t, err)
+	})
 }

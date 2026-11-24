@@ -27,9 +27,16 @@ func (r *StoryRepository) FindLatestByUserID(db *gorm.DB, story *entity.Story, u
 }
 
 func (r *StoryRepository) Update(db *gorm.DB, story *entity.Story) error {
-	return db.Model(story).
+	result := db.Model(story).
 		Select("content", "word_count", "analysis_status", "updated_at").
-		Updates(story).Error
+		Updates(story)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // FindByIDAndUserID mengambil satu cerita tertentu milik pengguna.

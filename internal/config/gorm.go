@@ -17,11 +17,15 @@ func NewDatabase(viper *viper.Viper, log *logrus.Logger) *gorm.DB {
 	host := viper.GetString("database.host")
 	port := viper.GetInt("database.port")
 	database := viper.GetString("database.name")
+	sslMode := viper.GetString("database.sslmode")
+	if sslMode == "" {
+		sslMode = "disable"
+	}
 	idleConnection := viper.GetInt("database.pool.idle")
 	maxConnection := viper.GetInt("database.pool.max")
 	maxLifeTimeConnection := viper.GetInt("database.pool.lifetime")
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=Asia/Jakarta", host, username, password, database, port)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s TimeZone=Asia/Jakarta", host, username, password, database, port, sslMode)
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN: dsn,
 	}), &gorm.Config{
