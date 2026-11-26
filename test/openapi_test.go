@@ -80,4 +80,10 @@ func TestOpenAPIDocumentation(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(html), "url: '/openapi.json'")
 	require.Contains(t, string(html), "persistAuthorization: false")
+	require.Contains(t, string(html), `<div id="swagger-ui"></div>`)
+	require.Contains(t, string(html), "window.onload = function () {")
+	require.Contains(t, string(html), "<noscript>Swagger UI")
+	require.Equal(t, 1, strings.Count(string(html), "</body>"))
+	require.Equal(t, 1, strings.Count(string(html), "</noscript>"))
+	require.Equal(t, 2, strings.Count(string(html), "</script>"))
 }
