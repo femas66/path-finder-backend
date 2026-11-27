@@ -43,7 +43,7 @@ operasi bisnis. Perubahan kontrak otomatis masuk binary setelah build ulang.
 
 Pemeriksaan kesetaraan pada `TestOpenAPIDocumentation` memasang seluruh controller aktif
 (`UserController`, `AdminMahasiswaController`, `HajiCodingController`, `StoryController`,
-`JobController`, dan `ApplicationController`), memastikan setiap route yang aktif terdaftar
+`JobController`, `ApplicationController`, dan `RecommendationController`), memastikan setiap route yang aktif terdaftar
 secara lengkap dan akurat di `openapi.json`.
 
 ## CDN dan akses jaringan
@@ -271,10 +271,115 @@ Kontrak lengkap tersedia di [Swagger UI](http://localhost:3000/docs) (tag **Stor
   - Otorisasi: Khusus role `mahasiswa`. Cerita milik pengguna lain atau ID tidak ditemukan menghasilkan
     `404 Not Found`.
 
+## Recommendations: integrasi ML nyata
+
+`POST /api/recommendations`, Bearer JWT, khusus `mahasiswa`; role lain `403`.
+Tidak ada fallback data palsu, penyimpanan hasil, snapshot, atau route GET latest.
+Tidak mengubah `analysis_status` cerita.
+
+Body JSON wajib tepat satu key `consent_at`, string RFC3339 yang diberikan
+secara eksplisit setelah persetujuan pengguna. Key duplikat/asing, `null`,
+non-object, JSON tambahan, field hilang, atau timestamp invalid menghasilkan
+`400`. Jangan kirim identitas, cerita, CV, profil manual, atau katalog dari klien.
+Parser hanya memeriksa format timestamp; tidak memeriksa umur/waktu mendatang.
+Consent tidak disimpan; cerita historis tidak memiliki consent tersimpan, sehingga
+keberadaan cerita bukan bukti persetujuan. Jangan membuat timestamp otomatis
+sebagai pengganti persetujuan eksplisit.
+
+### Input terpercaya dan blocker data
+
+- `student_id`: identitas JWT; `narrative`: `content` cerita milik sendiri terbaru,
+  urutan `created_at DESC, id DESC`. Belum punya cerita: `404 Story not found`.
+- CV profil saat ini berupa URL, bukan teks hasil ekstraksi. URL tidak dikirim
+  sebagai teks; `cv_text: null`, `manual_profile: null`. Ekstraksi CV belum tersedia.
+- Katalog: seluruh row DB `jobs` dengan `status=aktif`, urutan `id ASC`, tanpa
+  pagination. Mapping field nyata: `ID` menjadi `job_id`, `Title` menjadi `title`,
+  `Category` menjadi `category`, `Description` menjadi `description`,
+  `RequiredSkills` menjadi `required_skills`, `OptionalSkills` menjadi
+  `optional_skills`, `Source` menjadi `source`, `SourceURL` menjadi `source_url`,
+  `CreatedAt.UTC()` menjadi `collected_at` berformat RFC3339Nano. Skill nil menjadi
+  `[]`. `requirements_text` dan `is_synthetic` tidak tersedia di DB, tidak dikirim;
+  default ML dipertahankan. Tidak ada penambahan field jobs atau nilai buatan.
+- Sumber ML hanya `Glints`, `Dealls`, `Jobstreet`, `LinkedIn` (case-sensitive).
+  Sumber `mitra` tidak diterima. Implementasi tidak menyaring row inkompatibel:
+  satu row aktif tidak valid menggagalkan seluruh katalog dengan `422`.
+- `source_url` boleh kosong pada CRUD jobs, tetapi wajib nonblank untuk ML.
+  Katalog saat ini tidak dijamin memenuhi kontrak: sumber mitra atau URL kosong
+  memblokir inferensi. Jangan mengganti sumber menjadi portal lain atau membuat URL.
+- Maksimal 200 jobs; ID unik/nonblank, title nonblank, kategori resmi,
+  `CreatedAt` nonzero, ID/title/category/source/source_url maksimal 2000 karakter,
+  description maksimal 20000. Setiap daftar skill maksimal 200, entri nonblank
+  maksimal 2000 karakter, tanpa duplikat case-insensitive. Semua row diperiksa;
+  tidak ada pemotongan katalog otomatis. Katalog kosong dikirim sebagai `[]`.
+
+### Respons dan kegagalan
+
+`200`: `WebResponse` dengan `success: true`, `message: "Recommendation generated"`,
+`data` langsung berisi payload ML, bukan envelope ML bersarang. `errors` dan
+`paging` tidak disertakan. Schema presisi tersedia pada `RecommendationResponse`
+dan `RecommendationItem` di [`openapi.json`](internal/apidocs/openapi.json).
+
+- `student_id` sama dengan JWT; `generated_at` RFC3339; `schema_version: "1.0"`;
+  `top_k: 3`, `items` array maksimal tiga, bukan jaminan tiga hasil.
+- `model_version` provenance asli ML: segmen dipisahkan `;`, wajib prefiks persis
+  `ner:`, `encoder:`, `ranker:` dengan suffix non-whitespace. Go tidak memaksakan
+  urutan, tidak men-trim prefiks, mengizinkan segmen tambahan.
+- `status`: `ok`, `parsial`, `profil_tidak_lengkap`. Status terakhir wajib
+  `items: []`; `ok` wajib seluruh item `score_status: ok`.
+- Item wajib seluruh key: `job_id`, `title`, `matching_score`, `cosine_similarity`,
+  `readiness_score`, `matched_skills`, `missing_skills`, `score_status`, `rank`.
+  ID unik dari katalog; title/entri skill nonblank, daftar skill non-null.
+- `matching_score` dan `readiness_score`: integer 0–100 atau null;
+  `cosine_similarity`: angka 0–1 atau null; `rank`: integer >=1 atau null.
+  Null dipertahankan, bukan nol. Rank tidak diwajibkan berurutan atau <=3.
+  `score_status=ok` wajib matching score non-null; `skor_belum_tersedia`,
+  `persyaratan_belum_tersedia`, `profil_tanpa_keterampilan` wajib matching score
+  null. `persyaratan_belum_tersedia` wajib `missing_skills: []`.
+
+Status HTTP:
+
+- `400`: body strict gagal atau `consent_at must be RFC3339`.
+- `401`: JWT/identitas tidak valid; `403`: bukan mahasiswa.
+- `404`: `Story not found`.
+- `413`: body publik/payload internal >1 MiB atau upstream 413.
+- `422`: `Catalog incompatible with ML contract` atau `Invalid recommendation input`
+  (termasuk upstream 400).
+- `500`: DB story/katalog gagal atau kegagalan internal controller.
+- `502`: `Invalid ML response`; malformed, field hilang/asing, kontrak salah,
+  gagal baca, atau respons >1 MiB.
+- `503`: `ML service unavailable`; konfigurasi invalid/hilang, koneksi gagal,
+  upstream non-200 selain 400/413, termasuk busy atau autentikasi internal gagal.
+- `504`: `ML service timed out`.
+
+Error dari recommendation controller menggunakan `success: false`, `message`
+dan `errors` string sama. Berbeda dari error umum, `data` adalah struct zero value:
+semua string `""`, `top_k: 0`, `items: null`, bukan `data: null`.
+Error middleware dapat memakai `data: null`; error transport/framework dapat berbeda.
+
+### Peluncuran dan konfigurasi
+
+Petunjuk peluncuran model, artefak lokal, environment Python, keamanan jaringan,
+dan smoke check: [`ml-service/README.md`](ml-service/README.md).
+Go memanggil `POST /recommend` pada service internal, tanpa redirect/fallback.
+
+Environment Go:
+
+- `ML_SERVICE_URL`: origin `http`/`https` service, misalnya `http://127.0.0.1:8090`;
+  tanpa credentials, query, fragment, atau path selain `/`.
+- `ML_SERVICE_TOKEN`: secret internal yang sama dengan service Python, ASCII
+  printable nonempty tanpa whitespace di awal/akhir. Bukan token JWT mahasiswa.
+- `ML_REQUEST_TIMEOUT_SECONDS`: integer 1–120, default 60.
+
+Konfigurasi hilang/invalid menonaktifkan inferensi (`503` ketika dipanggil), bukan
+seluruh API. Validasi consent, story, dan katalog berlangsung sebelum pemanggilan
+service sehingga dapat menghasilkan error lebih dahulu. Jangan mengekspos secret;
+service ML tetap internal. Tidak ada klaim katalog/model deployment sudah siap.
+
 ## Batas cakupan
 
 Kontrak mencakup endpoint aktif, termasuk delapan operasi jobs dan alias
 auth/perusahaan. Dashboard saat ini hanya identitas login. Alur lupa password
 mencakup pengiriman kode OTP, verifikasi kode, dan reset password beserta alias
-`/api/auth/*`. Cerita khusus role `mahasiswa`. Endpoint rekomendasi belum
-tersedia; dokumentasi tidak menjanjikan analisis atau snapshot rekomendasi.
+`/api/auth/*`. Cerita dan `POST /api/recommendations` khusus role `mahasiswa`.
+Rekomendasi memakai ML nyata; kesiapan bergantung konfigurasi, artefak, consent
+ eksplisit, dan kompatibilitas katalog. Tidak ada persistence atau route latest.

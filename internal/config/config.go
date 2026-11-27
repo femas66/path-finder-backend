@@ -14,6 +14,10 @@ func NewViper() *viper.Viper {
 	_ = gotenv.Load("../.env")
 
 	config := viper.New()
+	_ = config.BindEnv("ml.service_url", "ML_SERVICE_URL")
+	_ = config.BindEnv("ml.service_token", "ML_SERVICE_TOKEN")
+	_ = config.BindEnv("ml.request_timeout_seconds", "ML_REQUEST_TIMEOUT_SECONDS")
+	config.SetDefault("ml.request_timeout_seconds", 60)
 	if err := config.BindEnv("jwt.secret", "JWT_SECRET"); err != nil {
 		panic(fmt.Errorf("bind JWT_SECRET: %w", err))
 	}

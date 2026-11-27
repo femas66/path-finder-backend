@@ -3,7 +3,7 @@
   "info": {
     "title": "PathFinder API",
     "version": "1.0.0",
-    "description": "Kontrak statis backend Go Fiber berdasarkan route, controller, model, dan usecase saat ini. Role admin mengelola mahasiswa; mitra mengelola profil mitra (perusahaan adalah alias); mahasiswa mengelola profil mahasiswa. Cerita khusus role mahasiswa. Endpoint rekomendasi belum tersedia. Admin tidak otomatis mewarisi akses role lain. Endpoint alias dipertahankan dengan operationId unik. Endpoint hanya didaftarkan bila controller dan middleware terkait tersedia pada RouteConfig. Jobs mencakup katalog semua role login dan CRUD milik mitra; admin tidak mewarisi akses mitra. Verifikasi OTP dan reset password tersedia beserta alias auth. Request JSON didokumentasikan; batas format URL/upload mengikuti endpoint; source_url pada create/update jobs wajib http/https dengan hostname atau kosong. Validasi omitempty pada string mengabaikan nilai kosong. Error usecase/controller/middleware memakai WebResponse, data=null, errors string. Error level transport/framework (misalnya body limit/content type) dapat berbeda dari status domain yang tercantum."
+    "description": "Kontrak statis backend Go Fiber berdasarkan route, controller, model, dan usecase saat ini. Role admin mengelola mahasiswa; mitra mengelola profil mitra (perusahaan adalah alias); mahasiswa mengelola profil mahasiswa. Cerita khusus role mahasiswa. POST /api/recommendations tersedia khusus mahasiswa, inferensi ML nyata tanpa penyimpanan hasil. Admin tidak otomatis mewarisi akses role lain. Endpoint alias dipertahankan dengan operationId unik. Endpoint hanya didaftarkan bila controller dan middleware terkait tersedia pada RouteConfig. Jobs mencakup katalog semua role login dan CRUD milik mitra; admin tidak mewarisi akses mitra. Verifikasi OTP dan reset password tersedia beserta alias auth. Request JSON didokumentasikan; batas format URL/upload mengikuti endpoint; source_url pada create/update jobs wajib http/https dengan hostname atau kosong. Validasi omitempty pada string mengabaikan nilai kosong. Error memakai WebResponse dengan errors string; recommendation handler mengisi data dengan objek RecommendationResponse zero value, middleware dapat memakai data=null. Error level transport/framework (misalnya body limit/content type) dapat berbeda dari status domain yang tercantum."
   },
   "servers": [
     {
@@ -47,6 +47,10 @@
     {
       "name": "Applications",
       "description": "Pendaftaran lowongan magang oleh mahasiswa dan pengelolaan status oleh mitra pemilik lowongan."
+    },
+    {
+      "name": "Recommendations",
+      "description": "Inferensi ML nyata khusus mahasiswa; tanpa fallback data palsu, tanpa snapshot atau route latest."
     }
   ],
   "paths": {
@@ -2765,6 +2769,129 @@
           }
         }
       }
+    },
+    "/api/recommendations": {
+      "post": {
+        "tags": [
+          "Recommendations"
+        ],
+        "summary": "Rekomendasi ML nyata dari cerita terbaru mahasiswa",
+        "operationId": "generateRecommendations",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Khusus mahasiswa. Body strict hanya consent_at RFC3339 eksplisit. student_id dari JWT; narrative dari story milik sendiri terbaru (created_at DESC, id DESC), 404 bila belum ada. CV profil saat ini hanya URL, bukan teks: cv_text=null dan manual_profile=null. Katalog seluruh jobs status aktif, id ASC; tanpa pagination atau pemilihan job oleh klien. Mapping nyata: ID→job_id, Title→title, Category→category, Description→description, RequiredSkills→required_skills, OptionalSkills→optional_skills, Source→source, SourceURL→source_url, CreatedAt.UTC RFC3339Nano→collected_at. Skill nil menjadi []; requirements_text dan is_synthetic tidak dikirim karena tidak tersedia di DB. Hanya sumber Glints/Dealls/Jobstreet/LinkedIn; mitra tidak diterima. Semua row aktif divalidasi, bukan difilter diam-diam: satu sumber mitra/URL kosong/row invalid atau >200 jobs menggagalkan seluruh request 422. source_url opsional pada CRUD jobs tetapi wajib nonblank di sini. Tidak menambah field jobs palsu, tidak membuat katalog/sumber/timestamp/consent sintetis. Story historis tidak menyimpan consent; pemanggil wajib menyatakan consent_at tiap request. Hasil tidak dipersist, tidak mengubah analysis_status, tidak ada GET latest. Konfigurasi dan peluncuran: OPENAPI.md dan ml-service/README.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inferensi berhasil; status ML dapat parsial atau profil_tidak_lengkap. Tidak menyimpan hasil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationWebResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "400": {
+            "description": "Invalid recommendation request; consent_at must be RFC3339",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Story not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 1 MiB; Recommendation payload exceeds 1 MiB — body publik atau payload Go ke ML >1 MiB, atau upstream 413; error limit framework dapat berbeda.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Catalog incompatible with ML contract; Invalid recommendation input — katalog aktif tidak kompatibel, atau upstream 400 dipetakan ke 422; tidak ada normalisasi sumber/fallback.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unable to retrieve story; Unable to retrieve catalog; Recommendation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Invalid ML response — upstream 200 malformed, field hilang/tidak dikenal, kontrak salah, read gagal atau respons >1 MiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ML service unavailable — konfigurasi hilang/invalid, koneksi gagal, atau upstream non-200 selain 400/413 (termasuk busy dan auth internal).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "ML service timed out — deadline/timeout klien ML.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4312,6 +4439,257 @@
           "data",
           "paging"
         ]
+      },
+      "RecommendationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "consent_at"
+        ],
+        "properties": {
+          "consent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Persetujuan eksplisit pemanggil, diparse Go time.RFC3339. Tidak diambil dari story historis; tidak disimpan. Tidak ada pemeriksaan umur/future timestamp."
+          }
+        },
+        "description": "Tepat satu key consent_at, string RFC3339. Key duplikat, unknown, null, body non-object, trailing JSON, atau key hilang ditolak 400. Tidak menerima student_id, narrative, cv_text, manual_profile, atau jobs."
+      },
+      "RecommendationItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_id",
+          "title",
+          "matching_score",
+          "cosine_similarity",
+          "readiness_score",
+          "matched_skills",
+          "missing_skills",
+          "score_status",
+          "rank"
+        ],
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "description": "ID unik dalam items; wajib berasal dari katalog yang dikirim."
+          },
+          "title": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "matching_score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "nullable": true
+          },
+          "cosine_similarity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true
+          },
+          "readiness_score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "nullable": true
+          },
+          "matched_skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          },
+          "missing_skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          },
+          "score_status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "skor_belum_tersedia",
+              "persyaratan_belum_tersedia",
+              "profil_tanpa_keterampilan"
+            ]
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          }
+        },
+        "description": "Semua key wajib; null skor/rank dipertahankan, bukan diubah menjadi nol. score_status=ok wajib matching_score non-null; status lain wajib matching_score=null. persyaratan_belum_tersedia wajib missing_skills=[]. readiness_score, cosine_similarity, rank boleh null independen; Go tidak memaksakan rank berurutan atau <=3."
+      },
+      "RecommendationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "student_id",
+          "generated_at",
+          "schema_version",
+          "model_version",
+          "top_k",
+          "status",
+          "items"
+        ],
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "description": "Sama dengan identitas JWT mahasiswa pemanggil."
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "schema_version": {
+            "type": "string",
+            "enum": [
+              "1.0"
+            ]
+          },
+          "model_version": {
+            "type": "string",
+            "description": "String provenance dari ML; dipisah titik koma, wajib memiliki segmen berprefiks persis ner:, encoder:, ranker:, masing-masing suffix non-whitespace. Bukan versi hardcoded atau status ketersediaan model. Go tidak memaksakan urutan, tidak men-trim prefiks, tidak menolak segmen tambahan."
+          },
+          "top_k": {
+            "type": "integer",
+            "enum": [
+              3
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "parsial",
+              "profil_tidak_lengkap"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/components/schemas/RecommendationItem"
+            }
+          }
+        },
+        "description": "Payload ML langsung dalam WebResponse.data, bukan envelope kedua. profil_tidak_lengkap wajib items=[]; ok wajib setiap item score_status=ok. parsial mengikuti aturan per item. top_k=3 adalah batas, bukan jaminan tiga hasil; [] valid. Field tak dikenal atau respons tidak sesuai kontrak ditolak 502."
+      },
+      "RecommendationWebResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "Recommendation generated"
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/RecommendationResponse"
+          }
+        },
+        "description": "model.WebResponse[RecommendationResponse]; errors dan paging dihilangkan pada sukses."
+      },
+      "RecommendationErrorResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "data",
+          "errors"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "student_id",
+              "generated_at",
+              "schema_version",
+              "model_version",
+              "top_k",
+              "status",
+              "items"
+            ],
+            "properties": {
+              "student_id": {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              "generated_at": {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              "schema_version": {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              "model_version": {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              "top_k": {
+                "type": "integer",
+                "enum": [
+                  0
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              "items": {
+                "type": "array",
+                "nullable": true,
+                "maxItems": 0,
+                "items": {
+                  "$ref": "#/components/schemas/RecommendationItem"
+                },
+                "description": "Zero value Go: null, bukan []."
+              }
+            }
+          }
+        },
+        "description": "Error dari recommendation controller: data adalah struct zero value, bukan null; message=errors. Error middleware/framework dapat berbeda."
       }
     },
     "responses": {

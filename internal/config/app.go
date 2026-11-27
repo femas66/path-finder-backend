@@ -38,8 +38,8 @@ func Bootstrap(config *BootstrapConfig) {
 
 	// Partial unique index to protect against concurrency TOCTOU
 	if err := config.DB.Exec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_application 
-		ON applications (mahasiswa_id) 
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_application
+		ON applications (mahasiswa_id)
 		WHERE status IN ('pending', 'accepted');
 	`).Error; err != nil {
 		config.Log.Warnf("Failed to create partial unique index idx_unique_active_application: %v", err)
@@ -55,6 +55,9 @@ func Bootstrap(config *BootstrapConfig) {
 	// Setup services
 	mailService := service.NewMailService(config.Config, config.Log)
 	fcmService := service.NewFCMService(config.Config, config.Log)
+	mlService := service.NewMLService(config.Config, config.Log)
+	recommendationUseCase := usecase.NewRecommendationUseCase(config.DB, config.Log, storyRepository, jobRepository, mlService)
+	recommendationController := http.NewRecommendationController(recommendationUseCase, config.Log)
 
 	// Setup use cases
 	userUseCase := usecase.NewUserUseCase(
@@ -96,6 +99,7 @@ func Bootstrap(config *BootstrapConfig) {
 		StoryController:          storyController,
 		JobController:            jobController,
 		ApplicationController:    applicationController,
+		RecommendationController: recommendationController,
 		AuthMiddleware:           authMiddleware,
 		AdminMiddleware:          adminMiddleware,
 		MitraMiddleware:          mitraMiddleware,
