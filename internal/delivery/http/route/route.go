@@ -18,6 +18,7 @@ type RouteConfig struct {
 	StoryController          *http.StoryController
 	JobController            *http.JobController
 	ApplicationController    *http.ApplicationController
+	RecommendationController *http.RecommendationController
 	AuthMiddleware           fiber.Handler
 	AdminMiddleware          fiber.Handler
 	MitraMiddleware          fiber.Handler
@@ -53,6 +54,9 @@ func (c *RouteConfig) SetupGuestRoute() {
 }
 
 func (c *RouteConfig) SetupAuthRoute() {
+	if c.RecommendationController != nil && c.AuthMiddleware != nil && c.MahasiswaMiddleware != nil {
+		c.App.Post("/api/recommendations", c.AuthMiddleware, c.MahasiswaMiddleware, c.RecommendationController.Recommend)
+	}
 	if c.JobController != nil && c.AuthMiddleware != nil {
 		c.App.Get("/api/jobs", c.AuthMiddleware, c.JobController.List)
 		c.App.Get("/api/jobs/:id", c.AuthMiddleware, c.JobController.Get)
